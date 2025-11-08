@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EcoFi — Sustainable product finder</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="icon" href="images/logo-main.png" type="image/png">
+</head>
+<body>
+  <div class="app-container" role="application" aria-label="EcoFi application">
+    
+    <header class="site-header" role="banner" aria-label="Header">
+      <div class="header-inner">
+        
+        <div class="logo-section">
+          <button class="nav-link logo-link" data-target="home" type="button" aria-label="Go to Home">
+            <img src="images/logo-main.png" alt="EcoFi logo" class="logo" />
+          </button>
+        </div>
+        
+        <div class="search-bar-header">
+          <input type="search" id="headerSearch" placeholder="Search products..." aria-label="Search products" />
+          <button id="headerSearchBtn" class="search-icon-btn" type="button" aria-label="Search">🔍</button>
+        </div>
+
+        <nav class="top-nav" role="navigation" aria-label="Main navigation">
+          <button class="nav-link active" data-target="home" type="button">Home</button>
+          <button class="nav-link" data-target="search" type="button">Shop</button>
+          <button class="nav-link" data-target="favorites" type="button">Wishlist</button>
+          <button class="nav-link" id="authNavBtn" data-target="auth" type="button">Sign In</button>
+          <button class="nav-link" id="profileNavBtn" data-target="profile" type="button" style="display: none;">
+            <span id="userGreeting"></span>
+          </button>
+        </nav>
+
+        <div class="header-actions">
+          <button id="darkModeBtn" class="icon-btn" aria-label="Toggle dark mode" type="button">🌙</button>
+          <button id="logoutBtn" class="icon-btn logout-btn" aria-label="Logout" type="button" style="display: none;">🚪</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content" role="main" aria-live="polite">
+
+      <section id="home" class="page active" aria-hidden="false">
+        <div class="hero-banner">
+          <h2>Sustainable Living Starts Here</h2>
+          <p>Discover eco-friendly products that make a real difference</p>
+          <button id="quickSearchBtn" class="btn btn-primary" type="button">Explore Now</button>
+        </div>
+
+        <section class="categories-section">
+          <h3 class="section-title">Shop by Category</h3>
+          <div class="categories-grid">
+            <div class="category-card">
+              <div class="category-icon">🧴</div>
+              <h4>Personal Care</h4>
+            </div>
+            <div class="category-card">
+              <div class="category-icon">🍽️</div>
+              <h4>Kitchen</h4>
+            </div>
+            <div class="category-card">
+              <div class="category-icon">👜</div>
+              <h4>Accessories</h4>
+            </div>
+            <div class="category-card">
+              <div class="category-icon">🌿</div>
+              <h4>Wellness</h4>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="search" class="page" aria-hidden="true">
+        <div class="search-section">
+          <div class="search-header">
+            <h2>Shop Sustainable Products</h2>
+          </div>
+          
+          <div class="filters-container">
+            <select id="categoryFilter" aria-label="Filter by category">
+              <option value="">All categories</option>
+            </select>
+            <select id="sortSelect" aria-label="Sort results">
+              <option value="relevance">Sort: Relevance</option>
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
+              <option value="title-asc">Title: A → Z</option>
+            </select>
+          </div>
+
+          <div id="results" class="results-grid" aria-label="Search results"></div>
+        </div>
+      </section>
+
+      <section id="favorites" class="page" aria-hidden="true">
+        <div class="favorites-section">
+          <div class="favorites-header">
+            <h2>Your Wishlist</h2>
+          </div>
+          <div id="favoritesList" class="results-grid" aria-label="Favorites list"></div>
+        </div>
+      </section>
+
+      <section id="settings" class="page" aria-hidden="true">
+        <div class="settings-section">
+          <h2>Settings</h2>
+          <div class="settings-grid">
+            <div class="setting-item">
+              <div class="setting-content">
+                <h4>Dark Mode</h4>
+                <p>Enable dark mode for comfortable viewing</p>
+              </div>
+              <input type="checkbox" id="darkModeToggle" aria-label="Dark mode" class="toggle-switch" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="auth" class="page" aria-hidden="true">
+        <div class="auth-section">
+          <div class="auth-container">
+            <div class="auth-tabs">
+              <button class="auth-tab active" data-tab="signin" type="button">Sign In</button>
+              <button class="auth-tab" data-tab="signup" type="button">Sign Up</button>
+            </div>
+
+            <form id="signinForm" class="auth-form active" data-form="signin">
+              <h2>Welcome Back</h2>
+              <div class="form-group">
+                <label for="signinEmail">Email</label>
+                <input type="email" id="signinEmail" placeholder="your@email.com" required />
+              </div>
+              <div class="form-group">
+                <label for="signinPassword">Password</label>
+                <input type="password" id="signinPassword" placeholder="••••••••" required />
+              </div>
+              <button type="submit" class="btn btn-primary btn-lg">Sign In</button>
+            </form>
+
+            <form id="signupForm" class="auth-form" data-form="signup">
+              <h2>Create Account</h2>
+              <div class="form-group">
+                <label for="signupName">Full Name</label>
+                <input type="text" id="signupName" placeholder="John Doe" required />
+              </div>
+              <div class="form-group">
+                <label for="signupEmail">Email</label>
+                <input type="email" id="signupEmail" placeholder="your@email.com" required />
+              </div>
+              <div class="form-group">
+                <label for="signupPassword">Password</label>
+                <input type="password" id="signupPassword" placeholder="••••••••" required />
+              </div>
+              <div class="form-group">
+                <label for="signupConfirm">Confirm Password</label>
+                <input type="password" id="signupConfirm" placeholder="••••••••" required />
+              </div>
+              <button type="submit" class="btn btn-primary btn-lg">Create Account</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="profile" class="page" aria-hidden="true">
+        <div class="profile-section">
+          <div class="profile-container">
+            <div class="profile-header">
+              <div class="profile-avatar">👤</div>
+              <h2>My Profile</h2>
+            </div>
+            <div class="profile-details">
+              <div class="profile-field">
+                <label>Full Name</label>
+                <p id="profileName"></p>
+              </div>
+              <div class="profile-field">
+                <label>Email Address</label>
+                <p id="profileEmailDisplay"></p>
+              </div>
+              <div class="profile-field">
+                <label>Member Since</label>
+                <p id="profileJoinDate"></p>
+              </div>
+            </div>
+            <div class="profile-actions">
+              <button id="logoutBtnProfile" class="btn btn-primary" type="button">Logout</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer" role="contentinfo">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h5>About EcoFi</h5>
+          <p>Making sustainable living accessible to everyone</p>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <div id="toast" role="status" aria-live="polite" class="toast"></div>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
