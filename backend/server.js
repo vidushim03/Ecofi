@@ -192,11 +192,61 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function getExpandedQueries(rawQuery) {
+  const normalized = String(rawQuery || "").toLowerCase().replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+
+  const aliasMap = {
+    copy: ["notebook", "notebooks", "copybook", "exercise book", "spiral notebook", "stationery"],
+    copies: ["notebook", "notebooks", "copybook", "exercise book", "spiral notebook", "stationery"],
+    notebook: ["copy", "copies", "copybook", "exercise book", "stationery"],
+    notebooks: ["copy", "copies", "copybook", "exercise book", "stationery"],
+    "t shirt": ["t-shirt", "tshirt", "tee", "top"],
+    "t-shirt": ["t shirt", "tshirt", "tee", "top"],
+    tshirt: ["t shirt", "t-shirt", "tee", "top"],
+    tee: ["t shirt", "t-shirt", "tshirt", "top"],
+    shirt: ["top", "t shirt", "t-shirt", "tshirt"],
+    top: ["shirt", "t shirt", "t-shirt", "tshirt"],
+    shoes: ["shoe", "footwear", "sneakers", "boots", "sandals", "flats"],
+    shoe: ["shoes", "footwear", "sneakers", "boots", "sandals", "flats"],
+    sneaker: ["sneakers", "shoes", "footwear"],
+    sneakers: ["sneaker", "shoes", "footwear"],
+    bottle: ["bottles", "sipper", "flask", "container", "storage"],
+    bottles: ["bottle", "sipper", "flask", "container", "storage"],
+    sipper: ["bottle", "flask"],
+    flask: ["bottle", "sipper"],
+    jar: ["container", "storage"],
+    jars: ["container", "storage"],
+    container: ["containers", "jar", "box", "storage"],
+    containers: ["container", "jar", "box", "storage"],
+    planter: ["planters", "pot", "pots", "garden"],
+    planters: ["planter", "pot", "pots", "garden"],
+    pot: ["pots", "planter", "garden"],
+    pots: ["pot", "planter", "garden"],
+    soap: ["bodywash", "personal care", "cleanser"],
+    shampoo: ["hair care", "cleanser"],
+    toothbrush: ["dental care", "brush"],
+    diaper: ["diapers", "baby", "cloth diapers"],
+    diapers: ["diaper", "baby", "cloth diapers"],
+    toys: ["toy", "kids", "play"],
+    toy: ["toys", "kids", "play"],
+    gift: ["gifts", "gift box", "kit"],
+    gifts: ["gift", "gift box", "kit"],
+  };
+
+  const expanded = new Set([normalized]);
+  if (aliasMap[normalized]) {
+    for (const alt of aliasMap[normalized]) expanded.add(alt);
+  }
+  return Array.from(expanded);
+}
+
 async function atlasTextSearch({ q, category, subCategory, l3Category, sortOption }) {
   const rawQuery = String(q || "").trim();
   if (!rawQuery) return [];
 
   const atlasIndexName = process.env.ATLAS_SEARCH_INDEX || "default";
+  const atlasSynonymsName = process.env.ATLAS_SEARCH_SYNONYMS;
   const filter = [];
   if (category) filter.push({ equals: { path: "category", value: category } });
   if (subCategory) {
@@ -204,26 +254,42 @@ async function atlasTextSearch({ q, category, subCategory, l3Category, sortOptio
   }
   if (l3Category) filter.push({ equals: { path: "l3Category", value: l3Category } });
 
+  const expandedQueries = getExpandedQueries(rawQuery);
+  const textQuery = expandedQueries.length > 0 ? expandedQueries : [rawQuery];
+
+  const shouldClauses = [
+    {
+      text: {
+        query: textQuery,
+        path: ["title", "description", "category", "subCategory", "l3Category"],
+        fuzzy: { maxEdits: 1, prefixLength: 1 },
+      },
+    },
+    {
+      autocomplete: {
+        query: rawQuery,
+        path: "title",
+        fuzzy: { maxEdits: 1, prefixLength: 1 },
+      },
+    },
+  ];
+
+  // Optional Atlas synonym mapping for semantic-ish lexical aliases (e.g., copy -> notebook).
+  if (atlasSynonymsName) {
+    shouldClauses.push({
+      text: {
+        query: textQuery,
+        path: ["title", "description", "category", "subCategory", "l3Category"],
+        synonyms: atlasSynonymsName,
+      },
+    });
+  }
+
   const searchStage = {
     $search: {
       index: atlasIndexName,
       compound: {
-        should: [
-          {
-            text: {
-              query: rawQuery,
-              path: ["title", "description", "category", "subCategory", "l3Category"],
-              fuzzy: { maxEdits: 1, prefixLength: 1 },
-            },
-          },
-          {
-            autocomplete: {
-              query: rawQuery,
-              path: "title",
-              fuzzy: { maxEdits: 1, prefixLength: 1 },
-            },
-          },
-        ],
+        should: shouldClauses,
         minimumShouldMatch: 1,
       },
     },
@@ -272,17 +338,22 @@ async function fallbackTextSearch({
   const rawQuery = String(q || "").trim();
   if (!rawQuery) return [];
 
-  const tokens = rawQuery.split(/\s+/).filter(Boolean);
-  const flexiblePhrasePattern = tokens
-    .map((token) => escapeRegex(token))
-    .join("[\\s-]*");
-  const compactQuery = rawQuery.replace(/[\s-]+/g, "");
   const fallbackRegexes = [];
-  if (flexiblePhrasePattern) {
-    fallbackRegexes.push(new RegExp(flexiblePhrasePattern, "i"));
-  }
-  if (compactQuery) {
-    fallbackRegexes.push(new RegExp(escapeRegex(compactQuery), "i"));
+  const expandedQueries = getExpandedQueries(rawQuery);
+
+  for (const queryText of expandedQueries) {
+    const tokens = queryText.split(/\s+/).filter(Boolean);
+    const flexiblePhrasePattern = tokens
+      .map((token) => escapeRegex(token))
+      .join("[\\s-]*");
+    const compactQuery = queryText.replace(/[\s-]+/g, "");
+
+    if (flexiblePhrasePattern) {
+      fallbackRegexes.push(new RegExp(flexiblePhrasePattern, "i"));
+    }
+    if (compactQuery) {
+      fallbackRegexes.push(new RegExp(escapeRegex(compactQuery), "i"));
+    }
   }
 
   const textOrFilters = [];
