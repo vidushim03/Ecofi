@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>EcoFi — Sustainable product finder</title>
+  <title>EcoFi - Sustainable product finder</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -23,24 +23,170 @@
           </button>
         </div>
         
-        <div class="search-bar-header">
-          <input type="search" id="headerSearch" placeholder="Search products..." aria-label="Search products" />
-          <button id="headerSearchBtn" class="search-icon-btn" type="button" aria-label="Search">🔍</button>
-        </div>
-
-        <nav class="top-nav" role="navigation" aria-label="Main navigation">
-          <button class="nav-link active" data-target="home" type="button">Home</button>
-          <button class="nav-link" data-target="search" type="button">Shop</button>
-          <button class="nav-link" data-target="favorites" type="button">Wishlist</button>
-          <button class="nav-link" id="authNavBtn" data-target="auth" type="button">Sign In</button>
-          <button class="nav-link" id="profileNavBtn" data-target="profile" type="button" style="display: none;">
-            <span id="userGreeting"></span>
-          </button>
+        <nav class="top-nav" role="navigation" aria-label="Main categories">
+  
+          <div class="nav-item">
+            <button class="nav-link" data-category="Fashion">Fashion</button>
+            <div class="dropdown-menu mega-menu">
+              
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Fashion" data-subcategory="Apparel">Apparel</a></h4>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Apparel" data-l3category="Tops & T-Shirts">Tops & T-Shirts</a>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Apparel" data-l3category="Pants & Jeans">Pants & Jeans</a>
+              </div>
+              
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Fashion" data-subcategory="Footwear">Footwear</a></h4>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Footwear" data-l3category="Sneakers">Sneakers</a>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Footwear" data-l3category="Sandals & Flats">Sandals & Flats</a>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Footwear" data-l3category="Boots">Boots</a>
+              </div>
+              
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Fashion" data-subcategory="Bags & Accessories">Bags & Accessories</a></h4>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Bags & Accessories" data-l3category="Handbags">Handbags</a>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Bags & Accessories" data-l3category="Jewellery">Jewellery</a>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Bags & Accessories" data-l3category="Scarves & Belts">Scarves & Belts</a>
+              </div>
+              
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Fashion" data-subcategory="Activewear">Activewear</a></h4>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Activewear" data-l3category="Leggings & Tights">Leggings & Tights</a>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Activewear" data-l3category="Sports Bras">Sports Bras</a>
+                <a href="#" class="dropdown-link" data-category="Fashion" data-subcategory="Activewear" data-l3category="Workout Tops">Workout Tops</a>
+              </div>
+            </div>
+          </div>
+          
+          <div class="nav-item">
+            <button class="nav-link" data-category="Home">Home</button>
+            <div class="dropdown-menu mega-menu">
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Home" data-subcategory="Kitchen & Dining">Kitchen & Dining</a></h4>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Kitchen & Dining" data-l3category="Food Storage">Food Storage</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Kitchen & Dining" data-l3category="Table Runners">Table Runners</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Kitchen & Dining" data-l3category="Dinnerware">Dinnerware</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Kitchen & Dining" data-l3category="Cookware">Cookware</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Home" data-subcategory="Cleaning & Laundry">Cleaning & Laundry</a></h4>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Cleaning & Laundry" data-l3category="Cleaning Tools">Cleaning Tools</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Cleaning & Laundry" data-l3category="Laundry Bags">Laundry Bags</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Cleaning & Laundry" data-l3category="Bins & Organisers">Bins & Organisers</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Home" data-subcategory="Home Decor">Home Decor</a></h4>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Home Decor" data-l3category="Plants & Planters">Plants & Planters</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Home Decor" data-l3category="Aromas & Candles">Aromas & Candles</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Home" data-subcategory="Garden & Outdoor">Garden & Outdoor</a></h4>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Garden & Outdoor" data-l3category="Gardening Tools">Gardening Tools</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Garden & Outdoor" data-l3category="Outdoor Lighting">Outdoor Lighting</a>
+                <a href="#" class="dropdown-link" data-category="Home" data-subcategory="Garden & Outdoor" data-l3category="Outdoor Decor">Outdoor Decor</a>
+              </div>
+            </div>
+          </div>
+        
+          <div class="nav-item">
+            <button class="nav-link" data-category="Beauty">Beauty</button>
+            <div class="dropdown-menu mega-menu">
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Beauty" data-subcategory="Personal Care">Personal Care</a></h4>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Personal Care" data-l3category="Soaps & Bodywash">Soaps & Bodywash</a>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Personal Care" data-l3category="Dental Care">Dental Care</a>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Personal Care" data-l3category="Deodorants">Deodorants</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Beauty" data-subcategory="Skin Care">Skin Care</a></h4>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Skin Care" data-l3category="Face Wash">Face Wash</a>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Skin Care" data-l3category="Moisturisers">Moisturisers</a>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Skin Care" data-l3category="Sunscreens">Sunscreens</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Beauty" data-subcategory="Hair Care">Hair Care</a></h4>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Hair Care" data-l3category="Shampoo">Shampoo</a>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Hair Care" data-l3category="Conditioner">Conditioner</a>
+                <a href="#" class="dropdown-link" data-category="Beauty" data-subcategory="Hair Care" data-l3category="Hair Oils">Hair Oils</a>
+              </div>
+              </div>
+          </div>
+        
+          <div class="nav-item">
+            <button class="nav-link" data-category="Baby & Kids">Baby & Kids</button>
+            <div class="dropdown-menu mega-menu">
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Baby & Kids" data-subcategory="Diapering">Diapering</a></h4>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Diapering" data-l3category="Cloth Diapers">Cloth Diapers</a>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Diapering" data-l3category="Wipes & Creams">Wipes & Creams</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Baby & Kids" data-subcategory="Feeding">Feeding</a></h4>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Feeding" data-l3category="Bottles & Sippers">Bottles & Sippers</a>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Feeding" data-l3category="Bibs & Utensils">Bibs & Utensils</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Baby & Kids" data-subcategory="Toys & Play">Toys & Play</a></h4>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Toys & Play" data-l3category="Wooden Toys">Wooden Toys</a>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Toys & Play" data-l3category="Soft Toys">Soft Toys</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Baby & Kids" data-subcategory="Kids' Fashion">Kids' Fashion</a></h4>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Kids' Fashion" data-l3category="Organic Cotton Wear">Organic Cotton Wear</a>
+                <a href="#" class="dropdown-link" data-category="Baby & Kids" data-subcategory="Kids' Fashion" data-l3category="Kids' Footwear">Kids' Footwear</a>
+              </div>
+            </div>
+          </div>
+          
+          <div class="nav-item">
+            <button class="nav-link" data-category="Lifestyle">Lifestyle</button>
+            <div class="dropdown-menu mega-menu">
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Lifestyle" data-subcategory="Health & Wellness">Health & Wellness</a></h4>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Health & Wellness" data-l3category="Supplements">Supplements</a>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Health & Wellness" data-l3category="Yoga & Fitness">Yoga & Fitness</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Lifestyle" data-subcategory="Pet Care">Pet Care</a></h4>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Pet Care" data-l3category="Pet Food">Pet Food</a>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Pet Care" data-l3category="Pet Grooming">Pet Grooming</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Lifestyle" data-subcategory="Office & Stationery">Office & Stationery</a></h4>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Office & Stationery" data-l3category="Recycled Notebooks">Recycled Notebooks</a>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Office & Stationery" data-l3category="Desk Organisers">Desk Organisers</a>
+              </div>
+              <div class="mega-menu-column">
+                <h4><a href="#" class="dropdown-heading" data-category="Lifestyle" data-subcategory="Gifts & Kits">Gifts & Kits</a></h4>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Gifts & Kits" data-l3category="Curated Gift Boxes">Curated Gift Boxes</a>
+                <a href="#" class="dropdown-link" data-category="Lifestyle" data-subcategory="Gifts & Kits" data-l3category="Travel Kits">Travel Kits</a>
+              </div>
+            </div>
+          </div>
+        
         </nav>
 
         <div class="header-actions">
-          <button id="darkModeBtn" class="icon-btn" aria-label="Toggle dark mode" type="button">🌙</button>
-          <button id="logoutBtn" class="icon-btn logout-btn" aria-label="Logout" type="button" style="display: none;">🚪</button>
+          
+          <div class="search-bar-header">
+            <input type="search" id="headerSearch" placeholder="Search products..." aria-label="Search products" />
+            <button id="headerSearchBtn" class="search-icon-btn" type="button" aria-label="Search">🔍</button>
+          </div>
+
+          <div class="user-menu-container">
+            <button id="userMenuBtn" class="icon-btn" aria-label="User menu">👤</button>
+            <div class="dropdown-menu user-dropdown">
+              <a href="#" id="userDropdownSignIn" class="dropdown-link" data-target="auth">Sign In / Sign Up</a>
+              <a href="#" id="userDropdownProfile" class="dropdown-link" data-target="profile" style="display: none;">
+              <span id="userGreeting">Profile</span>
+              </a>
+              <a href="#" id="userDropdownWishlist" class="dropdown-link" data-target="wishlist" style="display: none;">Wishlist</a>
+              <a href="#" id="userDropdownSettings" class="dropdown-link" data-target="settings" style="display: none;">Settings</a>
+              
+              <a href="#" id="userDropdownLogout" class="dropdown-link" style="display: none;">Logout</a>
+            </div>
+          </div>
+          
         </div>
       </div>
     </header>
@@ -53,76 +199,124 @@
           <p>Discover eco-friendly products that make a real difference</p>
           <button id="quickSearchBtn" class="btn btn-primary" type="button">Explore Now</button>
         </div>
-
-        <section class="categories-section">
+      
+        <div class="categories-section-homepage">
           <h3 class="section-title">Shop by Category</h3>
-          <div class="categories-grid">
-            <div class="category-card">
-              <div class="category-icon">🧴</div>
-              <h4>Personal Care</h4>
-            </div>
-            <div class="category-card">
-              <div class="category-icon">🍽️</div>
-              <h4>Kitchen</h4>
-            </div>
-            <div class="category-card">
-              <div class="category-icon">👜</div>
-              <h4>Accessories</h4>
-            </div>
-            <div class="category-card">
-              <div class="category-icon">🌿</div>
-              <h4>Wellness</h4>
-            </div>
+          <div class="categories-grid-homepage">
+            
+            <button class="category-card-homepage" data-target="search" data-category="Fashion">
+              <span class="category-icon">👗</span>
+              <h4>Fashion</h4>
+            </button>
+            
+            <button class="category-card-homepage" data-target="search" data-category="Home">
+              <span class="category-icon">🛋️</span>
+              <h4>Home</h4>
+            </button>
+            
+            <button class="category-card-homepage" data-target="search" data-category="Beauty">
+              <span class="category-icon">🧴</span>
+              <h4>Beauty</h4>
+            </button>
+            
+            <button class="category-card-homepage" data-target="search" data-category="Baby & Kids">
+              <span class="category-icon">🧸</span>
+              <h4>Baby & Kids</h4>
+            </button>
+            
+            <button class="category-card-homepage" data-target="search" data-category="Lifestyle">
+              <span class="category-icon">🌿</span>
+              <h4>Lifestyle</h4>
+            </button>
+            
           </div>
-        </section>
+        </div>
       </section>
-
+      
       <section id="search" class="page" aria-hidden="true">
         <div class="search-section">
           <div class="search-header">
-            <h2>Shop Sustainable Products</h2>
+            <h2 id="searchPageTitle">Shop Sustainable Products</h2>
           </div>
           
           <div class="filters-container">
-            <select id="categoryFilter" aria-label="Filter by category">
-              <option value="">All categories</option>
-            </select>
             <select id="sortSelect" aria-label="Sort results">
               <option value="relevance">Sort: Relevance</option>
-              <option value="price-asc">Price: Low → High</option>
-              <option value="price-desc">Price: High → Low</option>
-              <option value="title-asc">Title: A → Z</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="title-asc">Title: A to Z</option>
             </select>
           </div>
-
+      
           <div id="results" class="results-grid" aria-label="Search results"></div>
         </div>
       </section>
-
-      <section id="favorites" class="page" aria-hidden="true">
+      
+      <section id="wishlist" class="page" aria-hidden="true">
         <div class="favorites-section">
           <div class="favorites-header">
             <h2>Your Wishlist</h2>
           </div>
-          <div id="favoritesList" class="results-grid" aria-label="Favorites list"></div>
+          <div id="wishlistList" class="results-grid" aria-label="Wishlist"></div>
         </div>
       </section>
-
+      
       <section id="settings" class="page" aria-hidden="true">
         <div class="settings-section">
-          <h2>Settings</h2>
-          <div class="settings-grid">
-            <div class="setting-item">
-              <div class="setting-content">
-                <h4>Dark Mode</h4>
-                <p>Enable dark mode for comfortable viewing</p>
-              </div>
-              <input type="checkbox" id="darkModeToggle" aria-label="Dark mode" class="toggle-switch" />
-            </div>
-          </div>
-        </div>
-      </section>
+          <h2>Account Settings</h2>
 
+          <div class="settings-layout">
+            
+            <nav class="settings-sidebar">
+              <a href="#" class="settings-nav-link active" data-target="settings-profile">Update Profile</a>
+              <a href="#" class="settings-nav-link" data-target="settings-password">Change Password</a>
+              <a href="#" class="settings-nav-link" data-target="settings-danger">Danger Zone</a>
+            </nav>
+
+            <div class="settings-content">
+              
+              <div id="settings-profile" class="settings-subpage active">
+                <div class="profile-container"> <h3>Update Profile</h3>
+                  <form id="updateNameForm">
+                    <div class="form-group">
+                      <label for="updateNameInput">Name</label>
+                      <input type="text" id="updateNameInput" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Name</button>
+                  </form>
+                </div>
+              </div>
+
+              <div id="settings-password" class="settings-subpage">
+                <div class="profile-container"> <h3>Change Password</h3>
+                  <form id="changePasswordForm">
+                    <div class="form-group">
+                      <label for="currentPassword">Current Password</label>
+                      <input type="password" id="currentPassword" required />
+                    </div>
+                    <div class="form-group">
+                      <label for="newPassword">New Password</label>
+                      <input type="password" id="newPassword" placeholder="Min. 6 characters" required />
+                    </div>
+                    <div class="form-group">
+                      <label for="confirmNewPassword">Confirm New Password</label>
+                      <input type="password" id="confirmNewPassword" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Change Password</button>
+                  </form>
+                </div>
+              </div>
+
+              <div id="settings-danger" class="settings-subpage">
+                <div class="profile-container danger-zone"> <h3>Danger Zone</h3>
+                  <p>Deleting your account is permanent and cannot be undone. All your data, including your wishlist, will be removed.</p>
+                  <button id="deleteAccountBtn" class="btn btn-danger" type="button">Delete My Account</button>
+                </div>
+              </div>
+
+            </div> </div> </div>
+      </section>
+      
       <section id="auth" class="page" aria-hidden="true">
         <div class="auth-section">
           <div class="auth-container">
@@ -130,40 +324,39 @@
               <button class="auth-tab active" data-tab="signin" type="button">Sign In</button>
               <button class="auth-tab" data-tab="signup" type="button">Sign Up</button>
             </div>
-
+      
             <form id="signinForm" class="auth-form active" data-form="signin">
-              <h2>Welcome Back</h2>
               <div class="form-group">
                 <label for="signinEmail">Email</label>
-                <input type="email" id="signinEmail" placeholder="your@email.com" required />
+                <input type="email" id="signinEmail" placeholder="you@example.com" required />
               </div>
               <div class="form-group">
                 <label for="signinPassword">Password</label>
                 <input type="password" id="signinPassword" placeholder="••••••••" required />
               </div>
-              <button type="submit" class="btn btn-primary btn-lg">Sign In</button>
+              <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
             </form>
-
+      
             <form id="signupForm" class="auth-form" data-form="signup">
-              <h2>Create Account</h2>
               <div class="form-group">
-                <label for="signupName">Full Name</label>
-                <input type="text" id="signupName" placeholder="John Doe" required />
+                <label for="signupName">Name</label>
+                <input type="text" id="signupName" placeholder="Your Name" required />
               </div>
               <div class="form-group">
                 <label for="signupEmail">Email</label>
-                <input type="email" id="signupEmail" placeholder="your@email.com" required />
+                <input type="email" id="signupEmail" placeholder="you@example.com" required />
               </div>
               <div class="form-group">
                 <label for="signupPassword">Password</label>
-                <input type="password" id="signupPassword" placeholder="••••••••" required />
+                <input type="password" id="signupPassword" placeholder="Min. 6 characters" required />
               </div>
               <div class="form-group">
                 <label for="signupConfirm">Confirm Password</label>
-                <input type="password" id="signupConfirm" placeholder="••••••••" required />
+                <input type="password" id="signupConfirm" placeholder="Re-type password" required />
               </div>
-              <button type="submit" class="btn btn-primary btn-lg">Create Account</button>
+              <button type="submit" class="btn btn-primary" style="width: 100%;">Create Account</button>
             </form>
+      
           </div>
         </div>
       </section>
@@ -176,18 +369,18 @@
               <h2>My Profile</h2>
             </div>
             <div class="profile-details">
-              <div class="profile-field">
-                <label>Full Name</label>
-                <p id="profileName"></p>
-              </div>
-              <div class="profile-field">
-                <label>Email Address</label>
-                <p id="profileEmailDisplay"></p>
-              </div>
-              <div class="profile-field">
-                <label>Member Since</label>
-                <p id="profileJoinDate"></p>
-              </div>
+            <div class="profile-field">
+              <label>Name</label>
+              <p id="profileName">Loading...</p>
+            </div>
+            <div class="profile-field">
+              <label>Email</label>
+              <p id="profileEmailDisplay">Loading...</p>
+            </div>
+            <div class="profile-field">
+              <label>Member Since</label>
+              <p id="profileJoinDate">Loading...</p>
+            </div>
             </div>
             <div class="profile-actions">
               <button id="logoutBtnProfile" class="btn btn-primary" type="button">Logout</button>
@@ -196,14 +389,106 @@
         </div>
       </section>
 
+      <section id="about" class="page" aria-hidden="true">
+        <div class="static-page-container">
+          <h2>About EcoFi</h2>
+          <p>Welcome to EcoFi, your curated guide to a more sustainable lifestyle. We believe that small choices, when made by many, can create a massive positive impact on our planet.</p>
+          <p>Our mission is simple: to make sustainable living accessible and straightforward. We're not just a product finder; we're a community dedicated to eco-friendly and ethical choices.</p>
+          
+          <h3>Our Story</h3>
+          <p>EcoFi was born from a simple question: "How can I be sure the products I buy are actually good for the planet?" We grew tired of confusing labels and "greenwashing." We wanted a single place where we could discover and trust eco-conscious brands.</p>
+          <p>Today, EcoFi partners with brands and scrapes the web to bring you a curated collection of products that meet our standards for sustainability, ethics, and quality. From fashion and beauty to home goods and baby care, every item on our platform is chosen with care.</p>
+          
+          <h3>Our Promise</h3>
+          <p>We're committed to transparency. We do our best to research every product, looking into materials, supply chains, and company practices. We're here to help you shop with confidence, knowing you're supporting a better future.</p>
+        </div>
+      </section>
+
+      <section id="contact" class="page" aria-hidden="true">
+        <div class="static-page-container">
+          <h2>Contact Us</h2>
+          <p>We'd love to hear from you! Whether you have a question about a product, a suggestion for a brand we should feature, or just want to say hello, please get in touch.</p>
+          
+          <form id="contactForm" class="auth-form active" style="max-width: 600px; margin: 0 auto;">
+            <div class="form-group">
+              <label for="contactName">Name</label>
+              <input type="text" id="contactName" placeholder="Your Name" required />
+            </div>
+            <div class="form-group">
+              <label for="contactEmail">Email</label>
+              <input type="email" id="contactEmail" placeholder="you@example.com" required />
+            </div>
+            <div class="form-group">
+              <label for="contactMessage">Message</label>
+              <textarea id="contactMessage" rows="6" style="width: 100%; padding: 10px; font-family: inherit; border: 1px solid var(--border); border-radius: 4px; background-color: var(--bg-light); color: var(--text-primary);" placeholder="Your message..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Send Message</button>
+          </form>
+        </div>
+      </section>
+      
+      <section id="faq" class="page" aria-hidden="true">
+        <div class="static-page-container">
+          <h2>Frequently Asked Questions (FAQ)</h2>
+          
+          <div class="faq-item">
+            <h3>How do you choose products for EcoFi?</h3>
+            <p>We have a rigorous selection process. We research brands based on their material sourcing, manufacturing processes, packaging, and overall commitment to ethical and sustainable practices. We look for certifications like Fair Trade, Organic, B Corp, and more.</p>
+          </div>
+
+          <div class="faq-item">
+            <h3>What is "greenwashing"?</h3>
+            <p>"Greenwashing" is a deceptive marketing practice where a company spends more time and money claiming to be "green" through advertising than actually implementing business practices that minimize
+            environmental impact. We work hard to see through this and feature genuinely sustainable products.</p>
+          </div>
+
+          <div class="faq-item">
+            <h3>How do I create an account?</h3>
+            <p>You can create a free account by clicking the "Sign In / Sign Up" link in the user menu (the person icon 👤) in the header. This will allow you to save products to your wishlist and manage your profile.</p>
+          </div>
+
+          <div class="faq-item">
+            <h3>How do I update my password?</h3>
+            <p>You can change your password by navigating to your Profile page (click the 👤 icon, then "Profile"). On that page, you will find a "Change Password" form. You will need to enter your current password and your new password.</p>
+          </div>
+
+          <div class="faq-item">
+            <h3>How do I delete my account?</h3>
+            <p>We're sad to see you go! You can permanently delete your account by going to your Profile page. At the bottom, you will find a "Danger Zone" with a "Delete My Account" button. Please be aware that this action is permanent and cannot be reversed.</p>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <footer class="site-footer" role="contentinfo">
       <div class="footer-content">
+        
         <div class="footer-section">
           <h5>About EcoFi</h5>
-          <p>Making sustainable living accessible to everyone</p>
+          <p>
+            EcoFi is your curated guide to sustainable living. We help you
+            discover eco-friendly and ethical products that are kind to you
+            and the planet.
+          </p>
+          <p><a href="#" class="footer-link" data-target="about">Learn more about us</a></p>
         </div>
+        
+        <div class="footer-section">
+          <h5>Quick Links</h5>
+          <p><a href="#" class="footer-link" data-target="home">Home</a></p>
+          <p><a href="#" class="footer-link" data-target="search">Shop All</a></p>
+          <p><a href="#" class="footer-link" data-target="wishlist">My Wishlist</a></p>
+        </div>
+        
+        <div class="footer-section">
+          <h5>Support</h5>
+          <p><a href="#" class="footer-link" data-target="faq">FAQ</a></p>
+          <p><a href="#" class="footer-link" data-target="contact">Contact Us</a></p>
+          <p>123 Green Way<br />Sustainable City, Planet Earth</p>
+          <p>2025 EcoFi. All Rights Reserved.</p>
+        </div>
+        
       </div>
     </footer>
 
