@@ -1,0 +1,27 @@
+meta {
+  name: Add Product
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:4000/api/admin/addproduct
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "adminKey": "mysecretadminpass",
+    "productId": "B0DFGY6JPX",
+    "source": "amazon-in",
+    "category": "Fashion",
+    "subCategory": "Footwear",
+    "l3Category": "Sneakers"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: ecofi-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: PORT
+        value: 4000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_SECRET_KEY
+        sync: false
+      - key: HF_API_KEY
+        sync: false
+      - key: ZENROWS_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
