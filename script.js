@@ -367,21 +367,25 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
   }
   
   const searchTerm = document.getElementById('headerSearch').value.trim();
+  const hasSearchTerm = searchTerm.length > 0;
   const sort = document.getElementById('sortSelect').value;
   const searchPageTitle = document.getElementById('searchPageTitle');
 
   const buildProductsUrl = (includeQuery = true) => {
     const url = new URL(apiUrl("/api/products"));
     if (includeQuery && searchTerm) url.searchParams.append("q", searchTerm);
-    if (effectiveCategory) url.searchParams.append("category", effectiveCategory);
-    if (effectiveSubCategory) url.searchParams.append("subCategory", effectiveSubCategory);
-    if (effectiveL3Category) url.searchParams.append("l3Category", effectiveL3Category);
+    // Global text search should not be restricted by current category filters.
+    if (!hasSearchTerm && effectiveCategory) url.searchParams.append("category", effectiveCategory);
+    if (!hasSearchTerm && effectiveSubCategory) url.searchParams.append("subCategory", effectiveSubCategory);
+    if (!hasSearchTerm && effectiveL3Category) url.searchParams.append("l3Category", effectiveL3Category);
     if (sort) url.searchParams.append("sort", sort);
     return url;
   };
 
   // Set the page title
-  if (effectiveL3Category) {
+  if (hasSearchTerm) {
+    searchPageTitle.textContent = `Search results for "${searchTerm}"`;
+  } else if (effectiveL3Category) {
     searchPageTitle.textContent = effectiveL3Category;
   } else if (effectiveSubCategory) {
     searchPageTitle.textContent = effectiveSubCategory;
