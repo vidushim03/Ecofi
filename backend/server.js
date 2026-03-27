@@ -187,6 +187,24 @@ app.delete("/api/profile", protect, async (req, res) => {
 // EMBEDDING HELPER FUNCTION
 // =================================================================
 const MODEL_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
+const failedSearchCounts = new Map();
+
+function trackFailedSearch(query) {
+  const key = String(query || "").toLowerCase().trim();
+  if (!key) return;
+  failedSearchCounts.set(key, (failedSearchCounts.get(key) || 0) + 1);
+}
+
+function logTopFailedSearches(limit = 5) {
+  const entries = Array.from(failedSearchCounts.entries());
+  if (entries.length === 0) return;
+  const top = entries
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([query, count]) => `${query}:${count}`)
+    .join(", ");
+  console.log(`[Search][Analytics] Top failed queries -> ${top}`);
+}
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -946,6 +964,10 @@ app.get("/api/products", async (req, res) => {
             sortOption,
           });
         }
+      }
+      if (products.length === 0) {
+        trackFailedSearch(q);
+        logTopFailedSearches();
       }
     } else {
       console.log(`[Search] Performing filter search.`);
