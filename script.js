@@ -400,21 +400,7 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
     if (!res.ok) throw new Error('Failed to fetch products');
     
     const data = await res.json();
-    let products = data.products || [];
-
-    // If a query returns nothing, fallback to non-query listing so the catalog remains usable.
-    if (searchTerm && products.length === 0) {
-      const fallbackRes = await fetch(buildProductsUrl(false));
-      if (fallbackRes.ok) {
-        const fallbackData = await fallbackRes.json();
-        products = fallbackData.products || [];
-        if (products.length > 0) {
-          showToast("No exact match found. Showing available products.");
-        }
-      }
-    }
-
-    renderProducts(products, 'results');
+    renderProducts(data.products || [], 'results');
   } catch (err) {
     console.error(err);
     document.getElementById('results').innerHTML = '<p>Could not load products.</p>';
