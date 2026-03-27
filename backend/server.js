@@ -192,6 +192,121 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+async function atlasTextSearch({ q, category, subCategory, l3Category, sortOption }) {
+  const rawQuery = String(q || "").trim();
+  if (!rawQuery) return [];
+
+  const atlasIndexName = process.env.ATLAS_SEARCH_INDEX || "default";
+  const filter = [];
+  if (category) filter.push({ equals: { path: "category", value: category } });
+  if (subCategory) {
+    filter.push({ equals: { path: "subCategory", value: subCategory } });
+  }
+  if (l3Category) filter.push({ equals: { path: "l3Category", value: l3Category } });
+
+  const searchStage = {
+    $search: {
+      index: atlasIndexName,
+      compound: {
+        should: [
+          {
+            text: {
+              query: rawQuery,
+              path: ["title", "description", "category", "subCategory", "l3Category"],
+              fuzzy: { maxEdits: 1, prefixLength: 1 },
+            },
+          },
+          {
+            autocomplete: {
+              query: rawQuery,
+              path: "title",
+              fuzzy: { maxEdits: 1, prefixLength: 1 },
+            },
+          },
+        ],
+        minimumShouldMatch: 1,
+      },
+    },
+  };
+
+  if (filter.length > 0) {
+    searchStage.$search.compound.filter = filter;
+  }
+
+  const pipeline = [
+    searchStage,
+    {
+      $project: {
+        product_embedding: 0,
+        score: { $meta: "searchScore" },
+      },
+    },
+    { $limit: 50 },
+  ];
+
+  if (Object.keys(sortOption).length > 0) {
+    pipeline.push({ $sort: sortOption });
+  } else {
+    pipeline.push({ $sort: { score: -1 } });
+  }
+
+  try {
+    const results = await Product.aggregate(pipeline);
+    console.log(`[Search] Atlas Search returned ${results.length} results.`);
+    return results;
+  } catch (err) {
+    console.error(
+      `[Search] Atlas Search failed (${atlasIndexName}). Falling back to regex search: ${err.message}`
+    );
+    return null;
+  }
+}
+
+async function fallbackTextSearch({
+  q,
+  category,
+  subCategory,
+  l3Category,
+  sortOption,
+}) {
+  const rawQuery = String(q || "").trim();
+  if (!rawQuery) return [];
+
+  const tokens = rawQuery.split(/\s+/).filter(Boolean);
+  const flexiblePhrasePattern = tokens
+    .map((token) => escapeRegex(token))
+    .join("[\\s-]*");
+  const compactQuery = rawQuery.replace(/[\s-]+/g, "");
+  const fallbackRegexes = [];
+  if (flexiblePhrasePattern) {
+    fallbackRegexes.push(new RegExp(flexiblePhrasePattern, "i"));
+  }
+  if (compactQuery) {
+    fallbackRegexes.push(new RegExp(escapeRegex(compactQuery), "i"));
+  }
+
+  const textOrFilters = [];
+  for (const regex of fallbackRegexes) {
+    textOrFilters.push({ title: regex }, { description: regex });
+  }
+
+  if (textOrFilters.length === 0) {
+    return [];
+  }
+
+  const fallbackFilter = {
+    $or: textOrFilters,
+  };
+  if (category) fallbackFilter.category = category;
+  if (subCategory) fallbackFilter.subCategory = subCategory;
+  if (l3Category) fallbackFilter.l3Category = l3Category;
+
+  return Product.find(fallbackFilter)
+    .sort(sortOption)
+    .limit(50)
+    .select("-product_embedding");
+}
+
 async function getEmbedding(text) {
   console.log(
     `[NLP] Generating REAL embedding for: "${text.substring(0, 30)}..."`
@@ -692,43 +807,24 @@ app.get("/api/products", async (req, res) => {
 
       if (!queryVector || queryVector.every((v) => v === 0)) {
         console.error(
-          "[Search] Failed to generate query vector. Falling back to text search."
+          "[Search] Failed to generate query vector. Trying Atlas Search fallback."
         );
-        const rawQuery = String(q || "").trim();
-        const queryTokens = rawQuery.split(/\s+/).filter(Boolean);
-        const flexiblePhrasePattern = queryTokens
-          .map((token) => escapeRegex(token))
-          .join("[\\s-]*");
-        const compactQuery = rawQuery.replace(/[\s-]+/g, "");
-
-        const fallbackRegexes = [];
-        if (flexiblePhrasePattern) {
-          fallbackRegexes.push(new RegExp(flexiblePhrasePattern, "i"));
+        products = await atlasTextSearch({
+          q,
+          category,
+          subCategory,
+          l3Category,
+          sortOption,
+        });
+        if (!products || products.length === 0) {
+          products = await fallbackTextSearch({
+            q,
+            category,
+            subCategory,
+            l3Category,
+            sortOption,
+          });
         }
-        if (compactQuery) {
-          fallbackRegexes.push(new RegExp(escapeRegex(compactQuery), "i"));
-        }
-
-        const textOrFilters = [];
-        for (const regex of fallbackRegexes) {
-          textOrFilters.push({ title: regex }, { description: regex });
-        }
-
-        if (textOrFilters.length === 0) {
-          return res.json({ products: [] });
-        }
-
-        const fallbackFilter = {
-          $or: textOrFilters,
-        };
-        if (category) fallbackFilter.category = category;
-        if (subCategory) fallbackFilter.subCategory = subCategory;
-        if (l3Category) fallbackFilter.l3Category = l3Category;
-
-        products = await Product.find(fallbackFilter)
-          .sort(sortOption)
-          .limit(50)
-          .select("-product_embedding");
         return res.json({ products });
       }
 
@@ -759,6 +855,27 @@ app.get("/api/products", async (req, res) => {
       console.log(`[Search] Executing aggregation pipeline...`);
       products = await Product.aggregate(pipeline);
       console.log(`[Search] Found ${products.length} vector results.`);
+      if (products.length === 0) {
+        console.log(
+          "[Search] Vector search returned 0 results. Trying Atlas Search fallback."
+        );
+        products = await atlasTextSearch({
+          q,
+          category,
+          subCategory,
+          l3Category,
+          sortOption,
+        });
+        if (!products || products.length === 0) {
+          products = await fallbackTextSearch({
+            q,
+            category,
+            subCategory,
+            l3Category,
+            sortOption,
+          });
+        }
+      }
     } else {
       console.log(`[Search] Performing filter search.`);
       const filter = {};
