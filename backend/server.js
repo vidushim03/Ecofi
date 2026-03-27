@@ -188,6 +188,10 @@ app.delete("/api/profile", protect, async (req, res) => {
 // =================================================================
 const MODEL_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function getEmbedding(text) {
   console.log(
     `[NLP] Generating REAL embedding for: "${text.substring(0, 30)}..."`
@@ -690,9 +694,32 @@ app.get("/api/products", async (req, res) => {
         console.error(
           "[Search] Failed to generate query vector. Falling back to text search."
         );
-        const regex = new RegExp(q, "i");
+        const rawQuery = String(q || "").trim();
+        const queryTokens = rawQuery.split(/\s+/).filter(Boolean);
+        const flexiblePhrasePattern = queryTokens
+          .map((token) => escapeRegex(token))
+          .join("[\\s-]*");
+        const compactQuery = rawQuery.replace(/[\s-]+/g, "");
+
+        const fallbackRegexes = [];
+        if (flexiblePhrasePattern) {
+          fallbackRegexes.push(new RegExp(flexiblePhrasePattern, "i"));
+        }
+        if (compactQuery) {
+          fallbackRegexes.push(new RegExp(escapeRegex(compactQuery), "i"));
+        }
+
+        const textOrFilters = [];
+        for (const regex of fallbackRegexes) {
+          textOrFilters.push({ title: regex }, { description: regex });
+        }
+
+        if (textOrFilters.length === 0) {
+          return res.json({ products: [] });
+        }
+
         const fallbackFilter = {
-          $or: [{ title: regex }, { description: regex }],
+          $or: textOrFilters,
         };
         if (category) fallbackFilter.category = category;
         if (subCategory) fallbackFilter.subCategory = subCategory;
