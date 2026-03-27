@@ -665,6 +665,20 @@ app.post("/api/admin/remove-products", async (req, res) => {
 app.get("/api/products", async (req, res) => {
   try {
     const { category, subCategory, l3Category, sort, q } = req.query;
+    const sortOption = {};
+    switch (sort) {
+      case "price-asc":
+        sortOption.price = 1;
+        break;
+      case "price-desc":
+        sortOption.price = -1;
+        break;
+      case "title-asc":
+        sortOption.title = 1;
+        break;
+      default:
+        break;
+    }
 
     let products;
 
@@ -673,8 +687,22 @@ app.get("/api/products", async (req, res) => {
       const queryVector = await getEmbedding(q);
 
       if (!queryVector || queryVector.every((v) => v === 0)) {
-        console.error("[Search] Failed to generate query vector.");
-        return res.json({ products: [] });
+        console.error(
+          "[Search] Failed to generate query vector. Falling back to text search."
+        );
+        const regex = new RegExp(q, "i");
+        const fallbackFilter = {
+          $or: [{ title: regex }, { description: regex }],
+        };
+        if (category) fallbackFilter.category = category;
+        if (subCategory) fallbackFilter.subCategory = subCategory;
+        if (l3Category) fallbackFilter.l3Category = l3Category;
+
+        products = await Product.find(fallbackFilter)
+          .sort(sortOption)
+          .limit(50)
+          .select("-product_embedding");
+        return res.json({ products });
       }
 
       const pipeline = [
@@ -710,21 +738,6 @@ app.get("/api/products", async (req, res) => {
       if (category) filter.category = category;
       if (subCategory) filter.subCategory = subCategory;
       if (l3Category) filter.l3Category = l3Category;
-
-      let sortOption = {};
-      switch (sort) {
-        case "price-asc":
-          sortOption = { price: 1 };
-          break;
-        case "price-desc":
-          sortOption = { price: -1 };
-          break;
-        case "title-asc":
-          sortOption = { title: 1 };
-          break;
-        default:
-          break;
-      }
 
       products = await Product.find(filter)
         .sort(sortOption)

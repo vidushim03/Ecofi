@@ -366,24 +366,19 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
     effectiveL3Category = currentSearchFilters.l3Category;
   }
   
-  const searchTerm = document.getElementById('headerSearch').value;
+  const searchTerm = document.getElementById('headerSearch').value.trim();
   const sort = document.getElementById('sortSelect').value;
   const searchPageTitle = document.getElementById('searchPageTitle');
 
-  const url = new URL(apiUrl("/api/products"));
-  
-  if (searchTerm) url.searchParams.append('q', searchTerm);
-  
-  if (effectiveCategory) {
-    url.searchParams.append('category', effectiveCategory);
-  }
-  if (effectiveSubCategory) {
-    url.searchParams.append('subCategory', effectiveSubCategory);
-  }
-  if (effectiveL3Category) {
-    url.searchParams.append('l3Category', effectiveL3Category);
-  }
-  if (sort) url.searchParams.append('sort', sort);
+  const buildProductsUrl = (includeQuery = true) => {
+    const url = new URL(apiUrl("/api/products"));
+    if (includeQuery && searchTerm) url.searchParams.append("q", searchTerm);
+    if (effectiveCategory) url.searchParams.append("category", effectiveCategory);
+    if (effectiveSubCategory) url.searchParams.append("subCategory", effectiveSubCategory);
+    if (effectiveL3Category) url.searchParams.append("l3Category", effectiveL3Category);
+    if (sort) url.searchParams.append("sort", sort);
+    return url;
+  };
 
   // Set the page title
   if (effectiveL3Category) {
@@ -397,11 +392,25 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
   }
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(buildProductsUrl(true));
     if (!res.ok) throw new Error('Failed to fetch products');
     
     const data = await res.json();
-    renderProducts(data.products, 'results');
+    let products = data.products || [];
+
+    // If a query returns nothing, fallback to non-query listing so the catalog remains usable.
+    if (searchTerm && products.length === 0) {
+      const fallbackRes = await fetch(buildProductsUrl(false));
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json();
+        products = fallbackData.products || [];
+        if (products.length > 0) {
+          showToast("No exact match found. Showing available products.");
+        }
+      }
+    }
+
+    renderProducts(products, 'results');
   } catch (err) {
     console.error(err);
     document.getElementById('results').innerHTML = '<p>Could not load products.</p>';
