@@ -9,7 +9,9 @@ It combines a responsive frontend, secure user authentication, wishlist manageme
 - User authentication with JWT (`Sign up`, `Login`, `Profile`, `Change password`, `Delete account`)
 - Product discovery by category, subcategory, and sorting options
 - Wishlist management (add/remove products per user account)
-- Semantic product search pipeline using text embeddings
+- Hybrid search pipeline using vector search, fuzzy lexical fallback, and alias expansion
+- Paginated search UI with recent searches, popular search chips, loading states, and relevance badges
+- Admin tools UI for single product ingestion, bulk import, and controlled deletion flows
 - Admin ingestion endpoints for adding/removing products from multiple marketplaces
 - Responsive UI with mobile-friendly navigation and account settings sidebar
 
@@ -31,6 +33,20 @@ It combines a responsive frontend, secure user authentication, wishlist manageme
 - `backend/models/`: Mongoose models (`User`, `Product`)
 - `tests/smoke.test.js`: Smoke tests for core wiring
 - `render.yaml`: Render deployment config for backend
+- `vercel.json`, `netlify.toml`: Static frontend deployment configs
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A["Frontend (HTML/CSS/JS)"] --> B["Express API"]
+  B --> C["MongoDB Atlas"]
+  B --> D["Hugging Face Inference"]
+  B --> E["ZenRows Scraper"]
+  C --> F["Product Catalog + User Data"]
+  B --> G["Hybrid Search Layer"]
+  G --> C
+```
 
 ## Getting Started
 
@@ -89,6 +105,10 @@ Admin routes:
 - `POST /api/admin/add-bulk`
 - `POST /api/admin/remove-products`
 
+Response notes:
+- `GET /api/products` now returns `products` plus `meta` (`page`, `pageSize`, `total`, `totalPages`, `searchSource`)
+- Search can return results from `semantic`, `fuzzy`, `keyword`, or `catalog` modes
+
 ## Deployment
 
 ### Backend (Render)
@@ -107,6 +127,7 @@ Set these secrets in Render:
 
 - Deploy the project root as a static site
 - Configure API base URL using `localStorage` or a custom bootstrap script
+- `vercel.json` and `netlify.toml` are included for zero-config static deployment
 
 ## Testing
 
@@ -116,6 +137,12 @@ Run smoke tests:
 cd backend
 npm run test:smoke
 ```
+
+What the tests currently cover:
+- portable asset paths
+- API URL indirection
+- presence of core backend routes
+- presence of search/admin UI wiring
 
 ## Future Improvements
 

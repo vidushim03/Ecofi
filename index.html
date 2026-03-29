@@ -182,6 +182,7 @@
               </a>
               <a href="#" id="userDropdownWishlist" class="dropdown-link" data-target="wishlist" style="display: none;">Wishlist</a>
               <a href="#" id="userDropdownSettings" class="dropdown-link" data-target="settings" style="display: none;">Settings</a>
+              <a href="#" id="userDropdownAdmin" class="dropdown-link" data-target="admin">Admin Tools</a>
               
               <a href="#" id="userDropdownLogout" class="dropdown-link" style="display: none;">Logout</a>
             </div>
@@ -237,9 +238,35 @@
         <div class="search-section">
           <div class="search-header">
             <h2 id="searchPageTitle">Shop Sustainable Products</h2>
+            <p id="searchSummary" class="search-summary">Browse the catalog, or type a query to search globally.</p>
+          </div>
+
+          <div class="search-discovery">
+            <div class="search-chip-row">
+              <span class="search-chip-label">Recent</span>
+              <div id="recentSearches" class="search-chip-list" aria-label="Recent searches"></div>
+            </div>
+            <div class="search-chip-row">
+              <span class="search-chip-label">Popular</span>
+              <div id="popularSearches" class="search-chip-list" aria-label="Popular searches">
+                <button class="search-chip" type="button" data-query="t shirt">t shirt</button>
+                <button class="search-chip" type="button" data-query="copy">copy</button>
+                <button class="search-chip" type="button" data-query="bottle">bottle</button>
+                <button class="search-chip" type="button" data-query="planter">planter</button>
+                <button class="search-chip" type="button" data-query="toothbrush">toothbrush</button>
+              </div>
+            </div>
           </div>
           
           <div class="filters-container">
+            <label class="results-per-page">
+              <span>Per page</span>
+              <select id="pageSizeSelect" aria-label="Results per page">
+                <option value="8">8</option>
+                <option value="12" selected>12</option>
+                <option value="16">16</option>
+              </select>
+            </label>
             <select id="sortSelect" aria-label="Sort results">
               <option value="relevance">Sort: Relevance</option>
               <option value="price-asc">Price: Low to High</option>
@@ -247,8 +274,10 @@
               <option value="title-asc">Title: A to Z</option>
             </select>
           </div>
-      
+
+          <div id="resultsState" class="results-state" aria-live="polite"></div>
           <div id="results" class="results-grid" aria-label="Search results"></div>
+          <div id="paginationControls" class="pagination-controls" aria-label="Pagination"></div>
         </div>
       </section>
       
@@ -384,6 +413,126 @@
             </div>
             <div class="profile-actions">
               <button id="logoutBtnProfile" class="btn btn-primary" type="button">Logout</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="admin" class="page" aria-hidden="true">
+        <div class="settings-section admin-section">
+          <h2>Admin Tools</h2>
+          <p class="admin-intro">Use your admin key to add products, bulk import catalogs, or remove products using safe filters.</p>
+
+          <div class="settings-layout admin-layout">
+            <nav class="settings-sidebar admin-sidebar">
+              <a href="#" class="settings-nav-link active admin-nav-link" data-target="admin-add">Add Product</a>
+              <a href="#" class="settings-nav-link admin-nav-link" data-target="admin-bulk">Bulk Import</a>
+              <a href="#" class="settings-nav-link admin-nav-link" data-target="admin-remove">Remove Products</a>
+            </nav>
+
+            <div class="settings-content">
+              <div id="admin-add" class="settings-subpage active">
+                <div class="profile-container">
+                  <h3>Add Single Product</h3>
+                  <form id="adminAddProductForm">
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label for="adminKeyInput">Admin Key</label>
+                        <input type="password" id="adminKeyInput" placeholder="Enter admin key" required />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminSource">Source</label>
+                        <select id="adminSource" required>
+                          <option value="amazon-in">Amazon India</option>
+                          <option value="amazon-com">Amazon US</option>
+                          <option value="flipkart">Flipkart</option>
+                          <option value="myntra">Myntra</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label for="adminProductId">Product ID / Slug</label>
+                        <input type="text" id="adminProductId" placeholder="e.g. B0XXXXXXX" required />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminCategory">Category</label>
+                        <input type="text" id="adminCategory" placeholder="Fashion" required />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminSubCategory">Sub Category</label>
+                        <input type="text" id="adminSubCategory" placeholder="Apparel" required />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminL3Category">L3 Category</label>
+                        <input type="text" id="adminL3Category" placeholder="Tops & T-Shirts" />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminEcoScore">Eco Score</label>
+                        <select id="adminEcoScore">
+                          <option value="A+">A+</option>
+                          <option value="A" selected>A</option>
+                          <option value="B">B</option>
+                          <option value="C">C</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label for="adminEcoReasons">Eco Reasons</label>
+                        <input type="text" id="adminEcoReasons" placeholder="Comma separated reasons" />
+                      </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Product</button>
+                  </form>
+                </div>
+              </div>
+
+              <div id="admin-bulk" class="settings-subpage">
+                <div class="profile-container">
+                  <h3>Bulk Import</h3>
+                  <p class="admin-helper">Paste a JSON array of products using the backend bulk format.</p>
+                  <form id="adminBulkImportForm">
+                    <div class="form-group">
+                      <label for="adminBulkKeyInput">Admin Key</label>
+                      <input type="password" id="adminBulkKeyInput" placeholder="Enter admin key" required />
+                    </div>
+                    <div class="form-group">
+                      <label for="adminBulkPayload">Products JSON</label>
+                      <textarea id="adminBulkPayload" rows="10" placeholder='[{"productId":"...","source":"amazon-in","category":"Fashion","subCategory":"Apparel"}]' required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Run Bulk Import</button>
+                  </form>
+                </div>
+              </div>
+
+              <div id="admin-remove" class="settings-subpage">
+                <div class="profile-container danger-zone">
+                  <h3>Remove Products</h3>
+                  <p class="admin-helper">Provide at least one filter to prevent accidental deletion.</p>
+                  <form id="adminRemoveProductsForm">
+                    <div class="form-grid">
+                      <div class="form-group">
+                        <label for="adminRemoveKeyInput">Admin Key</label>
+                        <input type="password" id="adminRemoveKeyInput" placeholder="Enter admin key" required />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminRemoveCategory">Category</label>
+                        <input type="text" id="adminRemoveCategory" placeholder="Optional" />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminRemoveSubCategory">Sub Category</label>
+                        <input type="text" id="adminRemoveSubCategory" placeholder="Optional" />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminRemoveSource">Source</label>
+                        <input type="text" id="adminRemoveSource" placeholder="Optional" />
+                      </div>
+                      <div class="form-group">
+                        <label for="adminRemoveL3Category">L3 Category</label>
+                        <input type="text" id="adminRemoveL3Category" placeholder="Optional" />
+                      </div>
+                    </div>
+                    <button type="submit" class="btn btn-danger">Remove Matching Products</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
         </div>

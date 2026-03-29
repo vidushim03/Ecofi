@@ -10,11 +10,19 @@ let currentSearchFilters = {
   l3Category: null,
 };
 const FILTERS_KEY = "ecofi_current_filters";
+const RECENT_SEARCHES_KEY = "ecofi_recent_searches";
+const ADMIN_KEY_STORAGE = "ecofi_admin_key";
 const API_BASE_URL = (
   window.ECOFI_API_BASE_URL ||
   localStorage.getItem("ecofi_api_base_url") ||
   "http://localhost:4000"
 ).replace(/\/+$/, "");
+const searchState = {
+  page: 1,
+  pageSize: 12,
+  lastMeta: null,
+  lastQuery: "",
+};
 
 function apiUrl(path) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -50,6 +58,110 @@ function clearSearchFilters() {
     headerSearch.value = "";
   }
   sessionStorage.removeItem(FILTERS_KEY);
+}
+
+function getRecentSearches() {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY)) || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function saveRecentSearch(query) {
+  const normalized = query.trim();
+  if (!normalized) return;
+  const nextSearches = [normalized, ...getRecentSearches().filter((item) => item !== normalized)].slice(0, 6);
+  localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(nextSearches));
+}
+
+function renderRecentSearches() {
+  const container = document.getElementById("recentSearches");
+  if (!container) return;
+  const searches = getRecentSearches();
+  if (searches.length === 0) {
+    container.innerHTML = '<span class="search-summary">No recent searches yet.</span>';
+    return;
+  }
+  container.innerHTML = searches
+    .map(
+      (query) =>
+        `<button class="search-chip" type="button" data-query="${query.replace(/"/g, "&quot;")}">${query}</button>`
+    )
+    .join("");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function highlightText(text, query) {
+  const safeText = escapeHtml(text || "");
+  const normalizedQuery = (query || "").trim();
+  if (!normalizedQuery) return safeText;
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean).map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (tokens.length === 0) return safeText;
+  const regex = new RegExp(`(${tokens.join("|")})`, "gi");
+  return safeText.replace(regex, '<mark class="search-highlight">$1</mark>');
+}
+
+function renderResultsState(message = "", stateClass = "") {
+  const stateNode = document.getElementById("resultsState");
+  if (!stateNode) return;
+  stateNode.className = `results-state${stateClass ? ` ${stateClass}` : ""}`;
+  stateNode.textContent = message;
+}
+
+function renderLoadingSkeleton() {
+  const targetGrid = document.getElementById("results");
+  if (!targetGrid) return;
+  targetGrid.innerHTML = `
+    <div class="results-skeleton">
+      ${Array.from({ length: searchState.pageSize }).map(
+        () => `
+          <div class="skeleton-card">
+            <div class="skeleton-block skeleton-image"></div>
+            <div class="skeleton-content">
+              <div class="skeleton-block skeleton-line"></div>
+              <div class="skeleton-block skeleton-line"></div>
+              <div class="skeleton-block skeleton-line short"></div>
+            </div>
+          </div>
+        `
+      ).join("")}
+    </div>
+  `;
+}
+
+function renderPagination(meta) {
+  const container = document.getElementById("paginationControls");
+  if (!container) return;
+  if (!meta || meta.totalPages <= 1) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const pageButtons = [];
+  const startPage = Math.max(1, meta.page - 2);
+  const endPage = Math.min(meta.totalPages, meta.page + 2);
+  for (let page = startPage; page <= endPage; page += 1) {
+    pageButtons.push(`
+      <button class="pagination-btn${page === meta.page ? " active" : ""}" type="button" data-page="${page}">
+        ${page}
+      </button>
+    `);
+  }
+
+  container.innerHTML = `
+    <button class="pagination-btn" type="button" data-page="${meta.page - 1}" ${meta.page === 1 ? "disabled" : ""}>Prev</button>
+    ${pageButtons.join("")}
+    <button class="pagination-btn" type="button" data-page="${meta.page + 1}" ${meta.page === meta.totalPages ? "disabled" : ""}>Next</button>
+  `;
 }
 
 // Helper: Switch visible page
@@ -370,6 +482,8 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
   const hasSearchTerm = searchTerm.length > 0;
   const sort = document.getElementById('sortSelect').value;
   const searchPageTitle = document.getElementById('searchPageTitle');
+  const searchSummary = document.getElementById("searchSummary");
+  searchState.lastQuery = searchTerm;
 
   const buildProductsUrl = (includeQuery = true) => {
     const url = new URL(apiUrl("/api/products"));
@@ -379,31 +493,55 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
     if (!hasSearchTerm && effectiveSubCategory) url.searchParams.append("subCategory", effectiveSubCategory);
     if (!hasSearchTerm && effectiveL3Category) url.searchParams.append("l3Category", effectiveL3Category);
     if (sort) url.searchParams.append("sort", sort);
+    url.searchParams.append("page", String(searchState.page));
+    url.searchParams.append("pageSize", String(searchState.pageSize));
     return url;
   };
 
   // Set the page title
   if (hasSearchTerm) {
     searchPageTitle.textContent = `Search results for "${searchTerm}"`;
+    if (searchSummary) searchSummary.textContent = "Global search is active, so category filters are ignored while you type.";
   } else if (effectiveL3Category) {
     searchPageTitle.textContent = effectiveL3Category;
+    if (searchSummary) searchSummary.textContent = "Browsing a focused category slice from the EcoFi catalog.";
   } else if (effectiveSubCategory) {
     searchPageTitle.textContent = effectiveSubCategory;
+    if (searchSummary) searchSummary.textContent = "Browsing a focused category slice from the EcoFi catalog.";
   } else if (effectiveCategory) { 
     searchPageTitle.textContent = effectiveCategory;
+    if (searchSummary) searchSummary.textContent = "Browsing a focused category slice from the EcoFi catalog.";
   } else {
     searchPageTitle.textContent = "All Sustainable Products";
+    if (searchSummary) searchSummary.textContent = "Browse the catalog, or type a query to search globally.";
   }
 
   try {
+    renderResultsState("Loading products...", "loading");
+    renderLoadingSkeleton();
     const res = await fetch(buildProductsUrl(true));
     if (!res.ok) throw new Error('Failed to fetch products');
     
     const data = await res.json();
+    if (hasSearchTerm) {
+      saveRecentSearch(searchTerm);
+      renderRecentSearches();
+    }
+    searchState.lastMeta = data.meta || null;
     renderProducts(data.products || [], 'results');
+    renderPagination(data.meta || null);
+    if (data.meta) {
+      renderResultsState(
+        `${data.meta.total} result${data.meta.total === 1 ? "" : "s"} • Page ${data.meta.page} of ${data.meta.totalPages}${data.meta.searchSource ? ` • ${data.meta.searchSource}` : ""}`
+      );
+    } else {
+      renderResultsState("");
+    }
   } catch (err) {
     console.error(err);
-    document.getElementById('results').innerHTML = '<p>Could not load products.</p>';
+    renderResultsState("Could not load products right now.", "error");
+    document.getElementById('results').innerHTML = '<div class="empty-state"><h3>Search unavailable</h3><p>Try again in a moment or adjust your filters.</p></div>';
+    renderPagination(null);
   }
 }
 
@@ -412,7 +550,17 @@ function renderProducts(products, targetId = 'results') {
   if (!targetGrid) return;
   
   if (!products || products.length === 0) {
-    targetGrid.innerHTML = '<p>No products found for this category.</p>';
+    if (targetId === "wishlistList") {
+      targetGrid.innerHTML = '<div class="empty-state"><h3>Your wishlist is empty</h3><p>Save products you love and they will show up here.</p></div>';
+    } else {
+      const emptyTitle = searchState.lastQuery
+        ? `No results for "${searchState.lastQuery}"`
+        : "No products found";
+      const emptyBody = searchState.lastQuery
+        ? "Try a broader term, use one of the popular chips, or clear the search to browse the catalog."
+        : "Try another category or check back after more products are added.";
+      targetGrid.innerHTML = `<div class="empty-state"><h3>${escapeHtml(emptyTitle)}</h3><p>${escapeHtml(emptyBody)}</p></div>`;
+    }
     return;
   }
 
@@ -424,6 +572,9 @@ function renderProducts(products, targetId = 'results') {
     const isFavorite = currentUserWishlist.has(product._id);
     const heartIcon = isFavorite ? '❤️' : '♡';
     const favoriteClass = isFavorite ? 'is-favorite' : '';
+    const matchSource = product.matchMeta && product.matchMeta.source
+      ? `<span class="match-badge">${escapeHtml(product.matchMeta.source)}</span>`
+      : '';
 
     return `
       <div class="product-card">
@@ -431,12 +582,13 @@ function renderProducts(products, targetId = 'results') {
           <img src="${product.imageUrl || 'images/logo-main.png'}" alt="${product.title}">
         </a>
         <div>
+          <div class="product-card-meta">${matchSource}</div>
           <h3>
             <a href="${product.productUrl}" target="_blank" rel="noopener noreferrer" class="product-card-link-title">
-              ${product.title}
+              ${highlightText(product.title, targetId === "results" ? searchState.lastQuery : "")}
             </a>
           </h3>
-          <p>${shortDescription}</p>
+          <p>${highlightText(shortDescription, targetId === "results" ? searchState.lastQuery : "")}</p>
           <div class="card-row">
             <div>
               <button class="btn fav-btn ${favoriteClass}" data-id="${product._id}" aria-label="Add to wishlist">${heartIcon}</button>
@@ -501,6 +653,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else {
     clearSearchFilters();
   }
+  renderRecentSearches();
+  const pageSizeSelect = document.getElementById("pageSizeSelect");
+  if (pageSizeSelect) {
+    searchState.pageSize = Number.parseInt(pageSizeSelect.value, 10) || 12;
+  }
   
   fetchAndRenderProducts(); // Load products based on saved (or cleared) filters
 
@@ -521,7 +678,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (event.state.page === "profile") loadProfile();
       else if (event.state.page === "wishlist") loadWishlistPage();
       else if (event.state.page === "search") fetchAndRenderProducts();
-      else if (["about", "contact", "faq", "settings"].includes(event.state.page)) {
+      else if (["about", "contact", "faq", "settings", "admin"].includes(event.state.page)) {
          showPage(event.state.page, true);
       }
       showPage(event.state.page, true);
@@ -603,6 +760,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const subCategory = target.dataset.subcategory;
     const l3Category = target.dataset.l3category;
     
+    searchState.page = 1;
     fetchAndRenderProducts(category, subCategory, l3Category);
     showPage("search");
   });
@@ -639,6 +797,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     showPage("settings");
   });
+  document.getElementById("userDropdownAdmin")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    showPage("admin");
+  });
   document.getElementById("userDropdownLogout")?.addEventListener("click", (e) => {
     e.preventDefault();
     logout();
@@ -669,22 +831,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- Search Bar ---
   document.getElementById('headerSearchBtn').addEventListener('click', () => {
+    searchState.page = 1;
     fetchAndRenderProducts(); 
     showPage('search');
   });
   document.getElementById('headerSearch').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
+      searchState.page = 1;
       fetchAndRenderProducts();
       showPage('search');
     }
   });
   
   document.getElementById('sortSelect').addEventListener('change', () => {
+    searchState.page = 1;
+    fetchAndRenderProducts();
+  });
+  document.getElementById("pageSizeSelect")?.addEventListener("change", (e) => {
+    searchState.pageSize = Number.parseInt(e.target.value, 10) || 12;
+    searchState.page = 1;
     fetchAndRenderProducts();
   });
   
   document.getElementById("quickSearchBtn")?.addEventListener("click", () => {
     clearSearchFilters(); 
+    searchState.page = 1;
     fetchAndRenderProducts(); 
     showPage("search");
   });
@@ -697,9 +868,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     const category = card.dataset.category;
     
     if (category) {
+      searchState.page = 1;
       fetchAndRenderProducts(category); 
       showPage("search"); 
     }
+  });
+  document.querySelector(".search-discovery")?.addEventListener("click", (e) => {
+    const chip = e.target.closest(".search-chip");
+    if (!chip) return;
+    e.preventDefault();
+    const query = chip.dataset.query;
+    if (!query) return;
+    document.getElementById("headerSearch").value = query;
+    searchState.page = 1;
+    fetchAndRenderProducts();
+    showPage("search");
+  });
+  document.getElementById("paginationControls")?.addEventListener("click", (e) => {
+    const button = e.target.closest(".pagination-btn");
+    if (!button || button.disabled) return;
+    const nextPage = Number.parseInt(button.dataset.page, 10);
+    if (!Number.isFinite(nextPage) || nextPage < 1) return;
+    searchState.page = nextPage;
+    fetchAndRenderProducts();
+    showPage("search");
   });
 
   // --- Event Listener for Favorite Buttons (Heart) ---
@@ -739,6 +931,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       page.classList.remove("active");
     });
     document.getElementById(targetPageId)?.classList.add("active");
+  });
+  document.querySelector(".admin-sidebar")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    const targetLink = e.target.closest(".admin-nav-link");
+    if (!targetLink) return;
+    document.querySelectorAll(".admin-nav-link").forEach((link) => {
+      link.classList.remove("active");
+    });
+    targetLink.classList.add("active");
+    document.querySelectorAll("#admin .settings-subpage").forEach((page) => {
+      page.classList.remove("active");
+    });
+    document.getElementById(targetLink.dataset.target)?.classList.add("active");
   });
 
   // --- Contact Form ---
@@ -866,6 +1071,108 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("Account deleted successfully. Goodbye.");
       logout(); // Log the user out and redirect to home
 
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  const syncAdminKeys = (value) => {
+    ["adminKeyInput", "adminBulkKeyInput", "adminRemoveKeyInput"].forEach((id) => {
+      const input = document.getElementById(id);
+      if (input && input.value !== value) {
+        input.value = value;
+      }
+    });
+  };
+  const savedAdminKey = localStorage.getItem(ADMIN_KEY_STORAGE) || "";
+  syncAdminKeys(savedAdminKey);
+  ["adminKeyInput", "adminBulkKeyInput", "adminRemoveKeyInput"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", (e) => {
+      localStorage.setItem(ADMIN_KEY_STORAGE, e.target.value);
+      syncAdminKeys(e.target.value);
+    });
+  });
+
+  document.getElementById("adminAddProductForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const ecoReasons = document.getElementById("adminEcoReasons").value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const payload = {
+      adminKey: document.getElementById("adminKeyInput").value,
+      source: document.getElementById("adminSource").value,
+      productId: document.getElementById("adminProductId").value.trim(),
+      category: document.getElementById("adminCategory").value.trim(),
+      subCategory: document.getElementById("adminSubCategory").value.trim(),
+      l3Category: document.getElementById("adminL3Category").value.trim(),
+      ecoScore: document.getElementById("adminEcoScore").value,
+      ecoReasons,
+    };
+
+    try {
+      const res = await fetch(apiUrl("/api/admin/addproduct"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to add product");
+      showToast(data.message || "Product added successfully");
+      e.target.reset();
+      syncAdminKeys(localStorage.getItem(ADMIN_KEY_STORAGE) || "");
+      fetchAndRenderProducts();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  document.getElementById("adminBulkImportForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const products = JSON.parse(document.getElementById("adminBulkPayload").value);
+      const res = await fetch(apiUrl("/api/admin/add-bulk"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminKey: document.getElementById("adminBulkKeyInput").value,
+          products,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Bulk import failed");
+      showToast(data.message || "Bulk import complete");
+      fetchAndRenderProducts();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  document.getElementById("adminRemoveProductsForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const filters = {};
+    [["category", "adminRemoveCategory"], ["subCategory", "adminRemoveSubCategory"], ["source", "adminRemoveSource"], ["l3Category", "adminRemoveL3Category"]]
+      .forEach(([key, id]) => {
+        const value = document.getElementById(id).value.trim();
+        if (value) filters[key] = value;
+      });
+    if (Object.keys(filters).length === 0) {
+      showToast("Add at least one filter before removing products.", true);
+      return;
+    }
+    try {
+      const res = await fetch(apiUrl("/api/admin/remove-products"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminKey: document.getElementById("adminRemoveKeyInput").value,
+          filters,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to remove products");
+      showToast(`${data.deletedCount} products removed.`);
+      fetchAndRenderProducts();
     } catch (err) {
       showToast(err.message, true);
     }
