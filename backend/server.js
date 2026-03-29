@@ -259,6 +259,25 @@ function getExpandedQueries(rawQuery) {
   return Array.from(expanded);
 }
 
+function annotateProducts(products, matchSource) {
+  return products.map((product) => ({
+    ...product,
+    matchMeta: {
+      source: matchSource,
+    },
+  }));
+}
+
+function buildPaginationMeta(page, pageSize, total, searchSource) {
+  return {
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    searchSource,
+  };
+}
+
 async function atlasTextSearch({ q, category, subCategory, l3Category, sortOption }) {
   const rawQuery = String(q || "").trim();
   if (!rawQuery) return [];
@@ -393,6 +412,7 @@ async function fallbackTextSearch({
   return Product.find(fallbackFilter)
     .sort(sortOption)
     .limit(50)
+    .lean()
     .select("-product_embedding");
 }
 
@@ -873,6 +893,8 @@ app.post("/api/admin/remove-products", async (req, res) => {
 app.get("/api/products", async (req, res) => {
   try {
     const { category, subCategory, l3Category, sort, q } = req.query;
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const pageSize = Math.min(24, Math.max(4, Number.parseInt(req.query.pageSize, 10) || 12));
     const sortOption = {};
     switch (sort) {
       case "price-asc":
@@ -889,6 +911,7 @@ app.get("/api/products", async (req, res) => {
     }
 
     let products;
+    let searchSource = q ? "semantic" : "catalog";
 
     if (q) {
       console.log(`[Search] Performing vector search for: "${q}"`);
@@ -913,76 +936,94 @@ app.get("/api/products", async (req, res) => {
             l3Category,
             sortOption,
           });
+          searchSource = "keyword";
+        } else {
+          searchSource = "fuzzy";
         }
-        return res.json({ products });
       }
-
-      const pipeline = [
-        {
-          $vectorSearch: {
-            index: "vector_index",
-            path: "product_embedding",
-            queryVector: queryVector,
-            numCandidates: 100,
-            limit: 50,
+      if (products === undefined) {
+        const pipeline = [
+          {
+            $vectorSearch: {
+              index: "vector_index",
+              path: "product_embedding",
+              queryVector: queryVector,
+              numCandidates: 150,
+              limit: 120,
+            },
           },
-        },
-        {
-          $match: {},
-        },
-        {
-          $project: {
-            product_embedding: 0,
+          {
+            $match: {},
           },
-        },
-      ];
+          {
+            $project: {
+              product_embedding: 0,
+            },
+          },
+        ];
 
-      if (category) pipeline[1].$match.category = category;
-      if (subCategory) pipeline[1].$match.subCategory = subCategory;
-      if (l3Category) pipeline[1].$match.l3Category = l3Category;
+        if (category) pipeline[1].$match.category = category;
+        if (subCategory) pipeline[1].$match.subCategory = subCategory;
+        if (l3Category) pipeline[1].$match.l3Category = l3Category;
 
-      console.log(`[Search] Executing aggregation pipeline...`);
-      products = await Product.aggregate(pipeline);
-      console.log(`[Search] Found ${products.length} vector results.`);
-      if (products.length === 0) {
-        console.log(
-          "[Search] Vector search returned 0 results. Trying Atlas Search fallback."
-        );
-        products = await atlasTextSearch({
-          q,
-          category,
-          subCategory,
-          l3Category,
-          sortOption,
-        });
-        if (!products || products.length === 0) {
-          products = await fallbackTextSearch({
+        console.log(`[Search] Executing aggregation pipeline...`);
+        products = await Product.aggregate(pipeline);
+        console.log(`[Search] Found ${products.length} vector results.`);
+        if (products.length === 0) {
+          console.log(
+            "[Search] Vector search returned 0 results. Trying Atlas Search fallback."
+          );
+          products = await atlasTextSearch({
             q,
             category,
             subCategory,
             l3Category,
             sortOption,
           });
+          if (!products || products.length === 0) {
+            products = await fallbackTextSearch({
+              q,
+              category,
+              subCategory,
+              l3Category,
+              sortOption,
+            });
+            searchSource = "keyword";
+          } else {
+            searchSource = "fuzzy";
+          }
         }
       }
       if (products.length === 0) {
         trackFailedSearch(q);
         logTopFailedSearches();
       }
+      products = annotateProducts(products, searchSource);
     } else {
       console.log(`[Search] Performing filter search.`);
       const filter = {};
       if (category) filter.category = category;
       if (subCategory) filter.subCategory = subCategory;
       if (l3Category) filter.l3Category = l3Category;
-
+      const total = await Product.countDocuments(filter);
       products = await Product.find(filter)
         .sort(sortOption)
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .lean()
         .select("-product_embedding");
       console.log(`[Search] Found ${products.length} filter results.`);
+      return res.json({
+        products: annotateProducts(products, searchSource),
+        meta: buildPaginationMeta(page, pageSize, total, searchSource),
+      });
     }
-
-    res.json({ products });
+    const total = products.length;
+    const pagedProducts = products.slice((page - 1) * pageSize, page * pageSize);
+    res.json({
+      products: pagedProducts,
+      meta: buildPaginationMeta(page, pageSize, total, searchSource),
+    });
   } catch (err) {
     console.error("Error in /api/products:", err.message);
     res.status(500).json({

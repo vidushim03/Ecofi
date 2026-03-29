@@ -28,6 +28,14 @@ test("frontend API requests use apiUrl helper", () => {
   assert.match(scriptJs, /new URL\(apiUrl\("\/api\/products"\)\)/);
 });
 
+test("frontend includes richer search and admin UI", () => {
+  assert.match(indexHtml, /id="recentSearches"/);
+  assert.match(indexHtml, /id="paginationControls"/);
+  assert.match(indexHtml, /id="adminAddProductForm"/);
+  assert.match(scriptJs, /renderRecentSearches/);
+  assert.match(scriptJs, /adminBulkImportForm/);
+});
+
 test("backend exposes required core routes", () => {
   const requiredRoutes = [
     "app.post(\"/api/signup\"",
@@ -40,4 +48,10 @@ test("backend exposes required core routes", () => {
   for (const route of requiredRoutes) {
     assert.ok(serverJs.includes(route), `Missing required route: ${route}`);
   }
+});
+
+test("backend products route includes pagination metadata", () => {
+  assert.match(serverJs, /buildPaginationMeta/);
+  assert.match(serverJs, /searchSource/);
+  assert.match(serverJs, /pageSize/);
 });
