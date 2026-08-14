@@ -1,6 +1,7 @@
 console.log("✅ RUNNING THE SERVER.JS FILE ✅");
 
 const express = require("express");
+const path = require("path");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -26,6 +27,8 @@ const corsOptions = corsOrigins.includes("*")
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+app.use(express.static(path.join(__dirname, "..")));
 
 mongoose
   .connect(process.env.MONGO_URI)
