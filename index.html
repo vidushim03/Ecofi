@@ -168,9 +168,27 @@
 
         <div class="header-actions">
           
-          <div class="search-bar-header">
-            <input type="search" id="headerSearch" placeholder="Search products..." aria-label="Search products" />
-            <button id="headerSearchBtn" class="search-icon-btn" type="button" aria-label="Search">🔍</button>
+          <div class="search-bar-wrapper">
+            <div class="search-bar-header">
+              <input type="search" id="headerSearch" placeholder="Search products..." aria-label="Search products" />
+              <button id="headerSearchBtn" class="search-icon-btn" type="button" aria-label="Search">🔍</button>
+            </div>
+            <div id="searchSuggestions" class="search-suggestions" hidden>
+              <div class="search-chip-row">
+                <span class="search-chip-label">Recent</span>
+                <div id="recentSearches" class="search-chip-list" aria-label="Recent searches"></div>
+              </div>
+              <div class="search-chip-row">
+                <span class="search-chip-label">Popular</span>
+                <div id="popularSearches" class="search-chip-list" aria-label="Popular searches">
+                  <button class="search-chip" type="button" data-query="t shirt">t shirt</button>
+                  <button class="search-chip" type="button" data-query="copy">copy</button>
+                  <button class="search-chip" type="button" data-query="bottle">bottle</button>
+                  <button class="search-chip" type="button" data-query="planter">planter</button>
+                  <button class="search-chip" type="button" data-query="toothbrush">toothbrush</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="user-menu-container">
@@ -241,23 +259,6 @@
             <p id="searchSummary" class="search-summary">Browse the catalog, or type a query to search globally.</p>
           </div>
 
-          <div class="search-discovery">
-            <div class="search-chip-row">
-              <span class="search-chip-label">Recent</span>
-              <div id="recentSearches" class="search-chip-list" aria-label="Recent searches"></div>
-            </div>
-            <div class="search-chip-row">
-              <span class="search-chip-label">Popular</span>
-              <div id="popularSearches" class="search-chip-list" aria-label="Popular searches">
-                <button class="search-chip" type="button" data-query="t shirt">t shirt</button>
-                <button class="search-chip" type="button" data-query="copy">copy</button>
-                <button class="search-chip" type="button" data-query="bottle">bottle</button>
-                <button class="search-chip" type="button" data-query="planter">planter</button>
-                <button class="search-chip" type="button" data-query="toothbrush">toothbrush</button>
-              </div>
-            </div>
-          </div>
-          
           <div class="filters-container">
             <label class="results-per-page">
               <span>Per page</span>
@@ -644,6 +645,15 @@
   </div>
 
   <div id="toast" role="status" aria-live="polite" class="toast"></div>
+
+  <div id="productModal" class="modal-overlay" hidden>
+    <div class="product-modal" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+      <button id="productModalClose" class="modal-close" type="button" aria-label="Close">×</button>
+      <div id="productModalContent" class="product-modal-content">
+        <div class="product-modal-loading">Loading product details...</div>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js" defer></script>
 </body>

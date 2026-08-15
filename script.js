@@ -29,6 +29,63 @@ function apiUrl(path) {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
+function formatTimeAgo(dateValue) {
+  const date = new Date(dateValue);
+  if (isNaN(date.getTime())) return "";
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+async function refreshProductPrice(productId, button) {
+  if (button.dataset.loading === "true") return;
+  button.dataset.loading = "true";
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = "…";
+  try {
+    const res = await fetch(apiUrl(`/api/products/${productId}/price`));
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to refresh price");
+    }
+    const p = data.product;
+    const card = button.closest(".product-card");
+    if (card) {
+      const priceEl = card.querySelector(".price-value");
+      const updatedEl = card.querySelector(".price-updated");
+      if (priceEl) priceEl.textContent = `₹${Number(p.price).toFixed(2)}`;
+      if (updatedEl)
+        updatedEl.textContent = `Updated ${formatTimeAgo(p.lastPriceUpdated)}`;
+    }
+    const modal = button.closest(".product-modal");
+    if (modal) {
+      const valueEl = modal.querySelector(".product-detail-price-value");
+      const updatedEl = modal.querySelector(".price-updated");
+      if (valueEl) valueEl.textContent = `₹${Number(p.price).toFixed(2)}`;
+      if (updatedEl)
+        updatedEl.textContent = `Updated ${formatTimeAgo(p.lastPriceUpdated)}`;
+      const historyEl = modal.querySelector(".product-detail-history");
+      if (historyEl && Array.isArray(p.priceHistory) && p.priceHistory.length >= 2) {
+        historyEl.innerHTML = `<h3>Price History</h3>${renderSparkline(p.priceHistory)}`;
+      }
+    }
+    showToast("Price updated");
+  } catch (err) {
+    showToast(err.message || "Could not refresh price", true);
+  } finally {
+    button.dataset.loading = "false";
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
 // Helper: Show toast messages
 function showToast(message, isError = false) {
   const toast = document.getElementById("toast");
@@ -46,6 +103,120 @@ function showToast(message, isError = false) {
 function isValidEmail(email) {
   const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return re.test(String(email).toLowerCase());
+}
+
+const SOURCE_LABELS = {
+  "amazon-in": "Amazon India",
+  "amazon-com": "Amazon",
+  flipkart: "Flipkart",
+  myntra: "Myntra",
+};
+
+function closeProductDetail() {
+  const modal = document.getElementById("productModal");
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+async function openProductDetail(productId) {
+  const modal = document.getElementById("productModal");
+  const content = document.getElementById("productModalContent");
+  if (!modal || !content || !productId) return;
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  content.innerHTML = `<div class="product-modal-loading">Loading product details...</div>`;
+  try {
+    const res = await fetch(apiUrl(`/api/products/${productId}`));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Could not load product");
+    renderProductDetail(data.product);
+  } catch (err) {
+    content.innerHTML = `<div class="product-modal-error">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderProductDetail(product) {
+  const content = document.getElementById("productModalContent");
+  if (!content) return;
+
+  const sourceLabel = SOURCE_LABELS[product.source] || product.source || "Store";
+  const ecoClass = product.ecoScore
+    ? `eco-${String(product.ecoScore).toLowerCase().replace("+", "p")}`
+    : "";
+  const reasons =
+    Array.isArray(product.ecoReasons) && product.ecoReasons.length
+      ? product.ecoReasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")
+      : "<li>No eco reasons listed yet.</li>";
+  const history =
+    Array.isArray(product.priceHistory) && product.priceHistory.length >= 2
+      ? product.priceHistory
+      : [];
+
+  content.innerHTML = `
+    <div class="product-detail">
+      <div class="product-detail-main">
+        <div class="product-detail-image">
+          <img src="${escapeHtml(product.imageUrl || "images/logo-main.png")}" alt="${escapeHtml(product.title)}">
+        </div>
+        <div class="product-detail-info">
+          <div class="product-detail-meta">
+            <span class="match-badge">${escapeHtml(sourceLabel)}</span>
+            ${product.ecoScore ? `<span class="eco-badge ${ecoClass}">Eco ${escapeHtml(product.ecoScore)}</span>` : ""}
+          </div>
+          <h2 id="productModalTitle">${escapeHtml(product.title)}</h2>
+          <div class="product-detail-price">
+            <span class="product-detail-price-value">₹${Number(product.price).toFixed(2)}</span>
+            <button class="price-refresh-btn" data-id="${product._id}" title="Check latest price" aria-label="Refresh price">↻</button>
+          </div>
+          <div class="price-updated">${product.lastPriceUpdated ? `Updated ${formatTimeAgo(product.lastPriceUpdated)}` : "Price not refreshed yet"}</div>
+          <div class="product-detail-buy">
+            <a href="${escapeHtml(product.productUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Buy on ${escapeHtml(sourceLabel)} ↗</a>
+          </div>
+        </div>
+      </div>
+      ${history.length ? `<div class="product-detail-history"><h3>Price History</h3>${renderSparkline(history)}</div>` : ""}
+      <div class="product-detail-section">
+        <h3>Why it's eco-friendly</h3>
+        <ul class="eco-reasons">${reasons}</ul>
+      </div>
+      <div class="product-detail-section">
+        <h3>About this product</h3>
+        <p>${escapeHtml(product.description || "No description available.")}</p>
+        ${product.category ? `<p class="product-detail-categories">Category: <strong>${escapeHtml(product.category)}</strong>${product.subCategory ? ` · ${escapeHtml(product.subCategory)}` : ""}${product.l3Category ? ` · ${escapeHtml(product.l3Category)}` : ""}</p>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderSparkline(history) {
+  const points = history
+    .map((h) => ({ price: Number(h.price), date: new Date(h.date).getTime() }))
+    .filter((p) => Number.isFinite(p.price));
+  if (points.length === 0) return "";
+  const prices = points.map((p) => p.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const w = 280;
+  const h = 60;
+  const pad = 6;
+  const coords = points
+    .map((p, i) => {
+      const x = points.length === 1 ? pad : pad + (i * (w - pad * 2)) / (points.length - 1);
+      const y = h - pad - ((p.price - min) / range) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const lastY = (h - pad - ((points[points.length - 1].price - min) / range) * (h - pad * 2)).toFixed(1);
+  return `
+    <svg class="sparkline" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="Price history">
+      <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${coords}" />
+      <circle cx="${w - pad}" cy="${lastY}" r="3" fill="var(--accent)" />
+      <text x="${pad}" y="${h - 2}" class="sparkline-label">₹${min}</text>
+      <text x="${w - 46}" y="${h - 2}" class="sparkline-label">₹${max}</text>
+    </svg>
+  `;
 }
 
 function clearSearchFilters() {
@@ -577,8 +748,8 @@ function renderProducts(products, targetId = 'results') {
       : '';
 
     return `
-      <div class="product-card">
-        <a href="${product.productUrl}" target="_blank" rel="noopener noreferrer" class="product-card-link-image">
+      <div class="product-card" data-product-id="${product._id}">
+        <a href="${product.productUrl}" target="_blank" rel="noopener noreferrer" class="product-card-link-image" aria-label="View details for ${product.title}">
           <img src="${product.imageUrl || 'images/logo-main.png'}" alt="${product.title}">
         </a>
         <div>
@@ -593,7 +764,13 @@ function renderProducts(products, targetId = 'results') {
             <div>
               <button class="btn fav-btn ${favoriteClass}" data-id="${product._id}" aria-label="Add to wishlist">${heartIcon}</button>
             </div>
-            <div>₹${product.price.toFixed(2)}</div>
+            <div class="price-block">
+              <div class="price-line">
+                <span class="price-value">₹${product.price.toFixed(2)}</span>
+                <button class="price-refresh-btn" data-id="${product._id}" title="Check latest price" aria-label="Refresh price">↻</button>
+              </div>
+              <div class="price-updated">${product.lastPriceUpdated ? `Updated ${formatTimeAgo(product.lastPriceUpdated)}` : ""}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -830,17 +1007,37 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("logoutBtnProfile").addEventListener("click", logout);
 
   // --- Search Bar ---
+  const headerSearch = document.getElementById('headerSearch');
+  const searchSuggestions = document.getElementById("searchSuggestions");
+
+  function showSearchSuggestions() {
+    if (searchSuggestions) {
+      renderRecentSearches();
+      searchSuggestions.hidden = false;
+    }
+  }
+  function hideSearchSuggestions() {
+    if (searchSuggestions) searchSuggestions.hidden = true;
+  }
+
   document.getElementById('headerSearchBtn').addEventListener('click', () => {
+    hideSearchSuggestions();
     searchState.page = 1;
     fetchAndRenderProducts(); 
     showPage('search');
   });
   document.getElementById('headerSearch').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
+      hideSearchSuggestions();
       searchState.page = 1;
       fetchAndRenderProducts();
       showPage('search');
     }
+  });
+  headerSearch.addEventListener("focus", showSearchSuggestions);
+  headerSearch.addEventListener("input", showSearchSuggestions);
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-bar-wrapper")) hideSearchSuggestions();
   });
   
   document.getElementById('sortSelect').addEventListener('change', () => {
@@ -873,13 +1070,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       showPage("search"); 
     }
   });
-  document.querySelector(".search-discovery")?.addEventListener("click", (e) => {
+  document.querySelector("#searchSuggestions")?.addEventListener("click", (e) => {
     const chip = e.target.closest(".search-chip");
     if (!chip) return;
     e.preventDefault();
     const query = chip.dataset.query;
     if (!query) return;
     document.getElementById("headerSearch").value = query;
+    hideSearchSuggestions();
     searchState.page = 1;
     fetchAndRenderProducts();
     showPage("search");
@@ -904,8 +1102,47 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (productId) {
         toggleFavorite(productId, favButton);
       }
+      return;
+    }
+    const refreshButton = e.target.closest(".price-refresh-btn");
+    if (refreshButton) {
+      e.preventDefault();
+      e.stopPropagation();
+      const productId = refreshButton.dataset.id;
+      if (productId) {
+        refreshProductPrice(productId, refreshButton);
+      }
+      return;
+    }
+    const card = e.target.closest(".product-card");
+    if (card) {
+      const productId = card.dataset.productId;
+      if (productId) {
+        e.preventDefault();
+        openProductDetail(productId);
+      }
     }
   });
+
+  // --- Product Detail Modal ---
+  const productModal = document.getElementById("productModal");
+  const productModalClose = document.getElementById("productModalClose");
+  if (productModalClose) {
+    productModalClose.addEventListener("click", closeProductDetail);
+  }
+  if (productModal) {
+    productModal.addEventListener("click", (e) => {
+      if (e.target === productModal) closeProductDetail();
+      const refreshButton = e.target.closest(".price-refresh-btn");
+      if (refreshButton) {
+        const productId = refreshButton.dataset.id;
+        if (productId) refreshProductPrice(productId, refreshButton);
+      }
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !productModal.hidden) closeProductDetail();
+    });
+  }
   
   // ========================================================================
   // NEW/UPDATED: PROFILE & STATIC PAGE EVENT LISTENERS

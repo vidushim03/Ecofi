@@ -6,6 +6,16 @@ const productSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   imageUrl: { type: String, required: true },
   description: { type: String, default: 'No description available.' },
+  lastPriceUpdated: { type: Date },
+  priceHistory: {
+    type: [
+      {
+        price: { type: Number, required: true },
+        date: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  },
   
   // --- Multi-store fields ---
   productId: { type: String, required: true },

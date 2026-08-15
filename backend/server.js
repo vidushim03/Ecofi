@@ -12,6 +12,8 @@ const { Product } = require("./models/Product.js");
 const axios = require("axios");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const compression = require("compression");
+const cookieParser = require("cookie-parser");
 
 dotenv.config();
 
@@ -27,7 +29,9 @@ const corsOptions = corsOrigins.includes("*")
       origin: corsOrigins,
     };
 
-app.use(cors(corsOptions));
+app.use(cors({ ...corsOptions, credentials: true }));
+app.use(compression());
+app.use(cookieParser());
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -47,7 +51,7 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -81,6 +85,39 @@ app.use((req, res, next) => {
   next();
 });
 
+async function backfillPriceHistory() {
+  try {
+    const result = await Product.updateMany(
+      {
+        price: { $exists: true, $ne: null },
+        $or: [
+          { priceHistory: { $exists: false } },
+          { priceHistory: { $size: 0 } },
+        ],
+      },
+      [
+        {
+          $set: {
+            priceHistory: [
+              {
+                price: "$price",
+                date: {
+                  $ifNull: ["$lastPriceUpdated", "$$NOW"],
+                },
+              },
+            ],
+          },
+        },
+      ]
+    );
+    if (result.modifiedCount > 0) {
+      console.log(`[Backfill] Seeded price history for ${result.modifiedCount} products.`);
+    }
+  } catch (err) {
+    console.error("[Backfill] Failed to seed price history:", err.message);
+  }
+}
+
 async function connectToMongo(retries = 5) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -91,6 +128,7 @@ async function connectToMongo(retries = 5) {
         maxPoolSize: 10,
       });
       console.log("✅ MongoDB connected");
+      backfillPriceHistory();
       return;
     } catch (err) {
       console.error(
@@ -112,10 +150,16 @@ app.get("/", (req, res) => res.send("EcoFi backend running 🚀"));
 const protect = async (req, res, next) => {
   let token;
   const auth = req.headers.authorization;
+  const cookieToken = req.cookies && req.cookies.token;
 
-  if (auth && auth.startsWith("Bearer")) {
+  if (cookieToken) {
+    token = cookieToken;
+  } else if (auth && auth.startsWith("Bearer")) {
+    token = auth.split(" ")[1];
+  }
+
+  if (token) {
     try {
-      token = auth.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       req.user = await User.findById(decoded.id).select("-password");
@@ -124,6 +168,7 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: "User not found" });
       }
       next();
+      return;
     } catch (err) {
       let message = "Not authorized";
       if (err.name === "JsonWebTokenError") message = "Invalid token";
@@ -132,10 +177,19 @@ const protect = async (req, res, next) => {
     }
   }
 
-  if (!token) {
-    return res.status(401).json({ message: "Not authorized, no token" });
-  }
+  return res.status(401).json({ message: "Not authorized, no token" });
 };
+
+function setAuthCookie(res, token) {
+  res.cookie("token", token, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // =================================================================
 // Authentication Routes
@@ -145,6 +199,9 @@ app.post("/api/signup", async (req, res) => {
     const { name, email, password } = req.body;
     if (!name || !email || !password)
       return res.status(400).json({ message: "All fields required" });
+    if (!EMAIL_REGEX.test(String(email).trim())) {
+      return res.status(400).json({ message: "Please provide a valid email" });
+    }
     if (password.length < 6) {
       return res
         .status(400)
@@ -162,6 +219,7 @@ app.post("/api/signup", async (req, res) => {
         expiresIn: "7d",
       }
     );
+    setAuthCookie(res, token);
     res.json({
       message: "Account created successfully",
       token,
@@ -191,6 +249,7 @@ app.post("/api/login", async (req, res) => {
         expiresIn: "7d",
       }
     );
+    setAuthCookie(res, token);
     res.json({
       message: "Login successful",
       token,
@@ -276,6 +335,24 @@ app.delete("/api/profile", protect, async (req, res) => {
 // =================================================================
 const MODEL_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
 const failedSearchCounts = new Map();
+const embeddingCache = new Map();
+const EMBEDDING_CACHE_LIMIT = 200;
+
+function cachedEmbedding(text) {
+  const key = String(text || "").toLowerCase().trim();
+  if (!key) return null;
+  return embeddingCache.get(key) || null;
+}
+
+function storeEmbedding(text, vector) {
+  const key = String(text || "").toLowerCase().trim();
+  if (!key) return;
+  embeddingCache.set(key, vector);
+  if (embeddingCache.size > EMBEDDING_CACHE_LIMIT) {
+    const oldestKey = embeddingCache.keys().next().value;
+    embeddingCache.delete(oldestKey);
+  }
+}
 
 function trackFailedSearch(query) {
   const key = String(query || "").toLowerCase().trim();
@@ -505,6 +582,14 @@ async function fallbackTextSearch({
 }
 
 async function getEmbedding(text) {
+  const cached = cachedEmbedding(text);
+  if (cached) {
+    console.log(
+      `[NLP] Using cached embedding for: "${text.substring(0, 30)}..."`
+    );
+    return cached;
+  }
+
   console.log(
     `[NLP] Generating REAL embedding for: "${text.substring(0, 30)}..."`
   );
@@ -526,6 +611,7 @@ async function getEmbedding(text) {
     }
 
     console.log("[NLP] Successfully generated vector.");
+    storeEmbedding(text, response.data);
     return response.data;
   } catch (err) {
     console.error("[NLP] Error generating embedding:", err.message);
@@ -593,6 +679,71 @@ function buildZenRowsParams(source, productUrl, apikey) {
 
   return params;
 }
+
+function cleanScrapedPrice(price) {
+  if (typeof price === "number") return price;
+  return parseFloat(String(price).replace(/[^0-9.]/g, ""));
+}
+
+async function fetchScrapedProduct(source, productId) {
+  const { zenRowsEndpoint, productUrl } = getScraperConfig(source, productId);
+
+  let params;
+  if (source === "amazon-in" || source === "amazon-com") {
+    params = { url: productUrl, apikey: process.env.ZENROWS_API_KEY };
+  } else {
+    params = buildZenRowsParams(
+      source,
+      productUrl,
+      process.env.ZENROWS_API_KEY
+    );
+  }
+
+  const response = await axios.get(zenRowsEndpoint, { params });
+  const data = response.data;
+
+  let title, price, imageUrl, description;
+
+  if (source === "amazon-in" || source === "amazon-com") {
+    title = data.product_name;
+    price = data.product_price;
+    imageUrl =
+      data.product_images && data.product_images.length > 0
+        ? data.product_images[0]
+        : null;
+    description = data.product_description;
+  } else if (source === "myntra") {
+    let productData = null;
+    if (Array.isArray(data)) {
+      const allItems = data.flat(Infinity);
+      productData = allItems.find((item) => item && item["@type"] === "Product");
+    }
+    if (productData) {
+      title = productData.name;
+      price = productData.offers ? productData.offers.price : null;
+      imageUrl = productData.image;
+      description = productData.description;
+    }
+  } else if (source === "flipkart") {
+    title = data.title;
+    price = data.price;
+    imageUrl = data.imageUrl;
+    description = data.description;
+  }
+
+  const parsedPrice = cleanScrapedPrice(price);
+
+  if (!title || !parsedPrice || !imageUrl) {
+    const err = new Error("Scraper failed to find title, price, or image.");
+    err.code = "SCRAPE_INCOMPLETE";
+    err.productUrl = productUrl;
+    err.data = data;
+    throw err;
+  }
+
+  return { title, price: parsedPrice, imageUrl, description, productUrl };
+}
+
 app.post("/api/admin/addproduct", async (req, res) => {
   try {
     const {
@@ -625,103 +776,48 @@ app.post("/api/admin/addproduct", async (req, res) => {
       });
     }
 
-    const { zenRowsEndpoint, productUrl } = getScraperConfig(source, productId);
+    const { productUrl } = getScraperConfig(source, productId);
 
     console.log(`[Admin] Calling ZenRows for ${source}: ${productId}`);
     console.log(`[Admin] Scraping URL: ${productUrl}`);
-    console.log(`[Admin] Using Endpoint: ${zenRowsEndpoint}`);
 
-    let response;
+    let scraped;
     try {
-      let params;
-      if (source === "amazon-in" || source === "amazon-com") {
-        console.log(`[Admin] Using E-commerce GET request.`);
-        params = { url: productUrl, apikey: process.env.ZENROWS_API_KEY };
-      } else {
-        console.log(`[Admin] Using Generic GET request.`);
-        params = buildZenRowsParams(
-          source,
-          productUrl,
-          process.env.ZENROWS_API_KEY
-        );
-      }
-
-      response = await axios.get(zenRowsEndpoint, { params });
+      scraped = await fetchScrapedProduct(source, productId);
     } catch (scrapeError) {
       console.error(
-        `[Admin] HTTP Error scraping URL: ${productUrl}`,
+        `[Admin] Scraper failed for ${source} ${productId}:`,
         scrapeError.message
       );
-      if (scrapeError.response) {
-        console.error(
-          `[Admin] ZenRows Error Status: ${scrapeError.response.status}`
+      if (scrapeError.code === "SCRAPE_INCOMPLETE") {
+        console.log(`[Admin] URL Scraped: ${scrapeError.productUrl}`);
+        console.log(
+          `[Admin] Data Received (snippet): ${JSON.stringify(
+            scrapeError.data
+          ).substring(0, 200)}...`
         );
-        console.error(`[Admin] ZenRows Error Data:`, scrapeError.response.data);
+        return res.status(500).json({
+          message:
+            "Scraper failed to find title, price, or image. Check logs for received data.",
+          url: scrapeError.productUrl,
+          data: scrapeError.data,
+        });
       }
       return res.status(500).json({
         message: "Scraper request failed.",
-        url: productUrl,
+        url: scrapeError.productUrl,
         source: source,
         productId: productId,
       });
     }
 
-    const data = response.data;
-
-    let title, price, imageUrl, description;
-
-    if (source === "amazon-in" || source === "amazon-com") {
-      title = data.product_name;
-      price = data.product_price;
-      imageUrl =
-        data.product_images && data.product_images.length > 0
-          ? data.product_images[0]
-          : null;
-      description = data.product_description;
-    } else if (source === "myntra") {
-      let productData = null;
-      if (Array.isArray(data)) {
-        const allItems = data.flat(Infinity);
-        productData = allItems.find(
-          (item) => item && item["@type"] === "Product"
-        );
-      }
-      if (productData) {
-        title = productData.name;
-        price = productData.offers ? productData.offers.price : null;
-        imageUrl = productData.image;
-        description = productData.description;
-      }
-    } else if (source === "flipkart") {
-      title = data.title;
-      price = data.price;
-      imageUrl = data.imageUrl;
-      description = data.description;
-    }
-
-    if (!title || !price || !imageUrl) {
-      console.log(
-        `[Admin] DEBUG: Scraper failed to find fields for ${source} ${productId}.`
-      );
-      console.log(`[Admin] URL Scraped: ${productUrl}`);
-      console.log(
-        `[Admin] Data Received (snippet): ${JSON.stringify(data).substring(
-          0,
-          200
-        )}...`
-      );
-      return res.status(500).json({
-        message:
-          "Scraper failed to find title, price, or image. Check logs for received data.",
-        url: productUrl,
-        data: data,
-      });
-    }
-
-    let cleanPrice = price;
-    if (typeof price === "string") {
-      cleanPrice = price.replace(/[^0-9.]/g, "");
-    }
+    const {
+      title,
+      price: parsedPrice,
+      imageUrl,
+      description,
+      productUrl: scrapedProductUrl,
+    } = scraped;
 
     const embedding = await getEmbedding(
       `${title} ${description || ""} ${category} ${subCategory}`
@@ -732,7 +828,7 @@ app.post("/api/admin/addproduct", async (req, res) => {
       source: source,
       productUrl: productUrl,
       title: title,
-      price: parseFloat(cleanPrice),
+      price: parsedPrice,
       imageUrl: imageUrl,
       description: description,
       category: category,
@@ -741,6 +837,8 @@ app.post("/api/admin/addproduct", async (req, res) => {
       ecoScore: ecoScore,
       ecoReasons: ecoReasons,
       product_embedding: embedding,
+      lastPriceUpdated: new Date(),
+      priceHistory: [{ price: parsedPrice, date: new Date() }],
     });
 
     await newProduct.save();
@@ -1095,6 +1193,7 @@ app.get("/api/products", async (req, res) => {
         .lean()
         .select("-product_embedding");
       console.log(`[Search] Found ${products.length} filter results.`);
+      res.set("Cache-Control", "public, max-age=60");
       return res.json({
         products: annotateProducts(products, searchSource),
         meta: buildPaginationMeta(page, pageSize, total, searchSource),
@@ -1102,6 +1201,7 @@ app.get("/api/products", async (req, res) => {
     }
     const total = products.length;
     const pagedProducts = products.slice((page - 1) * pageSize, page * pageSize);
+    res.set("Cache-Control", "public, max-age=60");
     res.json({
       products: pagedProducts,
       meta: buildPaginationMeta(page, pageSize, total, searchSource),
@@ -1119,6 +1219,79 @@ app.get("/api/categories", async (req, res) => {
   } catch (err) {
     console.error("Error in /api/categories:", err.message);
     res.status(500).json({ message: "Server error fetching categories" });
+  }
+});
+
+const priceRefreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.get("/api/products/:id", async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id).select(
+      "-product_embedding"
+    );
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    res.set("Cache-Control", "public, max-age=30");
+    res.json({ product });
+  } catch (err) {
+    console.error("Error in /api/products/:id:", err.message);
+    res.status(500).json({ message: "Server error fetching product" });
+  }
+});
+
+app.get("/api/products/:id/price", priceRefreshLimiter, async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const fresh = await fetchScrapedProduct(product.source, product.productId);
+
+    if (!product.priceHistory || product.priceHistory.length === 0) {
+      product.priceHistory = [{ price: product.price, date: new Date() }];
+    }
+    if (fresh.price !== product.price) {
+      product.priceHistory.push({ price: product.price, date: new Date() });
+      if (product.priceHistory.length > 30) {
+        product.priceHistory = product.priceHistory.slice(-30);
+      }
+    }
+
+    product.price = fresh.price;
+    if (fresh.title) product.title = fresh.title;
+    if (fresh.imageUrl) product.imageUrl = fresh.imageUrl;
+    if (fresh.description) product.description = fresh.description;
+    product.lastPriceUpdated = new Date();
+    await product.save();
+
+    console.log(
+      `[PriceRefresh] ${product.productId} -> ₹${fresh.price} (was ₹${product.price})`
+    );
+    res.json({
+      product: {
+        _id: product._id,
+        title: product.title,
+        price: product.price,
+        imageUrl: product.imageUrl,
+        lastPriceUpdated: product.lastPriceUpdated,
+        priceHistory: product.priceHistory,
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/products/:id/price:", err.message);
+    res.status(500).json({
+      message:
+        err.code === "SCRAPE_INCOMPLETE"
+          ? "Could not extract the current price from the site."
+          : "Failed to refresh price.",
+    });
   }
 });
 
