@@ -10,6 +10,8 @@ const dotenv = require("dotenv");
 const { User } = require("./models/User.js");
 const { Product } = require("./models/Product.js");
 const axios = require("axios");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 dotenv.config();
 
@@ -26,14 +28,84 @@ const corsOptions = corsOrigins.includes("*")
     };
 
 app.use(cors(corsOptions));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        "default-src": ["'self'"],
+        "base-uri": ["'self'"],
+        "font-src": ["'self'", "https:", "data:"],
+        "form-action": ["'self'"],
+        "frame-ancestors": ["'self'"],
+        "img-src": ["'self'", "https:", "data:"],
+        "object-src": ["'none'"],
+        "script-src": ["'self'"],
+        "script-src-attr": ["'none'"],
+        "style-src": ["'self'", "https:", "'unsafe-inline'"],
+        "upgrade-insecure-requests": [],
+      },
+    },
+  })
+);
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname, "..")));
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err.message));
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api/signup", authLimiter);
+app.use("/api/login", authLimiter);
+app.use("/api/auth/change-password", authLimiter);
+app.use("/api/admin", adminLimiter);
+
+const FRONTEND_DIR = path.join(__dirname, "..");
+const PUBLIC_FILES = new Set(["/", "/index.html", "/style.css", "/script.js"]);
+
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  const p = decodeURIComponent(req.path);
+  if (PUBLIC_FILES.has(p) || p.startsWith("/images/")) {
+    if (p === "/") req.url = "/index.html";
+    return express.static(FRONTEND_DIR, { dotfiles: "deny" })(req, res, next);
+  }
+  next();
+});
+
+async function connectToMongo(retries = 5) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 30000,
+        connectTimeoutMS: 30000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+      });
+      console.log("✅ MongoDB connected");
+      return;
+    } catch (err) {
+      console.error(
+        `❌ MongoDB connection attempt ${attempt}/${retries} failed: ${err.message}`
+      );
+      if (attempt === retries) {
+        console.error("❌ Could not connect to MongoDB. Exiting.");
+        process.exit(1);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+    }
+  }
+}
+
+connectToMongo();
 
 app.get("/", (req, res) => res.send("EcoFi backend running 🚀"));
 
@@ -69,50 +141,65 @@ const protect = async (req, res, next) => {
 // Authentication Routes
 // =================================================================
 app.post("/api/signup", async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password)
-    return res.status(400).json({ message: "All fields required" });
-  const existing = await User.findOne({ email });
-  if (existing)
-    return res.status(400).json({ message: "Email already registered" });
-  const hashed = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, password: hashed });
-  const token = jwt.sign(
-    { id: user._id, email: user.email },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "7d",
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password)
+      return res.status(400).json({ message: "All fields required" });
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
     }
-  );
-  res.json({
-    message: "Account created successfully",
-    token,
-    user: { name: user.name, email: user.email, joinDate: user.joinDate },
-  });
+    const existing = await User.findOne({ email });
+    if (existing)
+      return res.status(400).json({ message: "Email already registered" });
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await User.create({ name, email, password: hashed });
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+    res.json({
+      message: "Account created successfully",
+      token,
+      user: { name: user.name, email: user.email, joinDate: user.joinDate },
+    });
+  } catch (err) {
+    console.error("Error in /api/signup:", err.message);
+    res.status(500).json({ message: "Server error during signup" });
+  }
 });
 
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return res.status(400).json({ message: "Incorrect password" });
-  }
-  const token = jwt.sign(
-    { id: user._id, email: user.email },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "7d",
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-  );
-  res.json({
-    message: "Login successful",
-    token,
-    user: { name: user.name, email: user.email, joinDate: user.joinDate },
-  });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(400).json({ message: "Incorrect password" });
+    }
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+    res.json({
+      message: "Login successful",
+      token,
+      user: { name: user.name, email: user.email, joinDate: user.joinDate },
+    });
+  } catch (err) {
+    console.error("Error in /api/login:", err.message);
+    res.status(500).json({ message: "Server error during login" });
+  }
 });
 
 app.post("/api/auth/change-password", protect, async (req, res) => {
@@ -168,9 +255,8 @@ app.patch("/api/profile/details", protect, async (req, res) => {
 
     res.json({ message: "Profile updated", user: updatedUser });
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Error updating profile", error: err.message });
+    console.error("Error updating profile:", err.message);
+    res.status(500).json({ message: "Error updating profile" });
   }
 });
 
@@ -180,9 +266,8 @@ app.delete("/api/profile", protect, async (req, res) => {
 
     res.json({ message: "Account deleted successfully" });
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Error deleting account", error: err.message });
+    console.error("Error deleting account:", err.message);
+    res.status(500).json({ message: "Error deleting account" });
   }
 });
 
@@ -574,7 +659,7 @@ app.post("/api/admin/addproduct", async (req, res) => {
         console.error(`[Admin] ZenRows Error Data:`, scrapeError.response.data);
       }
       return res.status(500).json({
-        message: `Scraper request failed: ${scrapeError.message}`,
+        message: "Scraper request failed.",
         url: productUrl,
         source: source,
         productId: productId,
@@ -665,9 +750,7 @@ app.post("/api/admin/addproduct", async (req, res) => {
       .json({ message: "Product added successfully!", product: newProduct });
   } catch (err) {
     console.error("Error in /api/admin/addproduct:", err.message);
-    res
-      .status(500)
-      .json({ message: "Server error while adding product", error: err.message });
+    res.status(500).json({ message: "Server error while adding product" });
   }
 });
 
@@ -849,9 +932,7 @@ app.post("/api/admin/add-bulk", async (req, res) => {
     });
   } catch (err) {
     console.error("Error in /api/admin/add-bulk:", err.message);
-    res
-      .status(500)
-      .json({ message: "Server error during bulk add", error: err.message });
+    res.status(500).json({ message: "Server error during bulk add" });
   }
 });
 
@@ -883,9 +964,7 @@ app.post("/api/admin/remove-products", async (req, res) => {
     });
   } catch (err) {
     console.error("Error in /api/admin/remove-products:", err.message);
-    res
-      .status(500)
-      .json({ message: "Server error during deletion", error: err.message });
+    res.status(500).json({ message: "Server error during deletion" });
   }
 });
 
@@ -1029,10 +1108,7 @@ app.get("/api/products", async (req, res) => {
     });
   } catch (err) {
     console.error("Error in /api/products:", err.message);
-    res.status(500).json({
-      message: "Server error fetching products",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Server error fetching products" });
   }
 });
 
@@ -1056,9 +1132,8 @@ app.get("/api/wishlist", protect, async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json({ products: user.wishlist });
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Server error fetching wishlist", error: err.message });
+    console.error("Error toggling wishlist:", err.message);
+    res.status(500).json({ message: "Server error toggling wishlist" });
   }
 });
 
@@ -1094,11 +1169,22 @@ app.post("/api/wishlist/toggle", protect, async (req, res) => {
       });
     }
   } catch (err) {
-    console.error("Error toggling wishlist:", err.message);
-    res
-      .status(500)
-      .json({ message: "Server error toggling wishlist", error: err.message });
+    console.error("Error fetching wishlist:", err.message);
+    res.status(500).json({ message: "Server error fetching wishlist" });
   }
+});
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ message: "Internal server error" });
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
 });
 
 // =================================================================
