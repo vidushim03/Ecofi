@@ -15,7 +15,7 @@ const ADMIN_KEY_STORAGE = "ecofi_admin_key";
 const API_BASE_URL = (
   window.ECOFI_API_BASE_URL ||
   localStorage.getItem("ecofi_api_base_url") ||
-  "http://localhost:4000"
+  (window.location.hostname === "localhost" ? "http://localhost:4000" : "")
 ).replace(/\/+$/, "");
 const searchState = {
   page: 1,
@@ -112,6 +112,21 @@ const SOURCE_LABELS = {
   myntra: "Myntra",
 };
 
+function inferSourceLabel(productUrl, source) {
+  if (source && SOURCE_LABELS[source]) return SOURCE_LABELS[source];
+  try {
+    const u = new URL(productUrl);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host.includes("amazon.in")) return "Amazon India";
+    if (host.includes("amazon.com") || host.includes("amazon.de") || host.includes("amazon.co.uk")) return "Amazon";
+    if (host.includes("flipkart.com")) return "Flipkart";
+    if (host.includes("myntra.com")) return "Myntra";
+    return host || "Store";
+  } catch {
+    return source || "Store";
+  }
+}
+
 function closeProductDetail() {
   const modal = document.getElementById("productModal");
   if (!modal) return;
@@ -140,7 +155,7 @@ function renderProductDetail(product) {
   const content = document.getElementById("productModalContent");
   if (!content) return;
 
-  const sourceLabel = SOURCE_LABELS[product.source] || product.source || "Store";
+  const sourceLabel = inferSourceLabel(product.productUrl, product.source);
   const ecoClass = product.ecoScore
     ? `eco-${String(product.ecoScore).toLowerCase().replace("+", "p")}`
     : "";
@@ -761,8 +776,9 @@ function renderProducts(products, targetId = 'results') {
           </h3>
           <p>${highlightText(shortDescription, targetId === "results" ? searchState.lastQuery : "")}</p>
           <div class="card-row">
-            <div>
-              <button class="btn fav-btn ${favoriteClass}" data-id="${product._id}" aria-label="Add to wishlist">${heartIcon}</button>
+            <div class="card-actions">
+              <button type="button" class="see-more-btn" data-id="${product._id}">See more product details</button>
+              <button type="button" class="btn fav-btn ${favoriteClass}" data-id="${product._id}" aria-label="Add to wishlist">${heartIcon}</button>
             </div>
             <div class="price-block">
               <div class="price-line">
@@ -776,6 +792,21 @@ function renderProducts(products, targetId = 'results') {
       </div>
     `;
   }).join('');
+}
+
+async function loadFeaturedProducts() {
+  const grid = document.getElementById("homeProducts");
+  if (!grid) return;
+  grid.innerHTML = "<p class=\"search-summary\">Loading featured products...</p>";
+  try {
+    const res = await fetch(apiUrl("/api/products?pageSize=9"));
+    if (!res.ok) throw new Error("Failed to load featured products");
+    const data = await res.json();
+    renderProducts(data.products || [], "homeProducts");
+  } catch (err) {
+    console.error("[Home] Could not load featured products:", err);
+    grid.innerHTML = '<p class="search-summary">Could not load featured products right now.</p>';
+  }
 }
 
 // -------------------------------
@@ -837,6 +868,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   
   fetchAndRenderProducts(); // Load products based on saved (or cleared) filters
+  loadFeaturedProducts(); // Show featured products on the home page
 
   // --- Handle Initial Page Load from URL Hash ---
   const initialPage = window.location.hash.substring(1) || "home";
@@ -981,6 +1013,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("userDropdownLogout")?.addEventListener("click", (e) => {
     e.preventDefault();
     logout();
+  });
+  document.getElementById("userDropdownDarkMode")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    const isDark = !document.body.classList.contains("dark");
+    applyDarkMode(isDark);
   });
   
   document.querySelector(".site-footer")?.addEventListener("click", (e) => {

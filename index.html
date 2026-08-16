@@ -201,6 +201,13 @@
               <a href="#" id="userDropdownWishlist" class="dropdown-link" data-target="wishlist" style="display: none;">Wishlist</a>
               <a href="#" id="userDropdownSettings" class="dropdown-link" data-target="settings" style="display: none;">Settings</a>
               <a href="#" id="userDropdownAdmin" class="dropdown-link" data-target="admin">Admin Tools</a>
+              <a href="#" id="userDropdownDarkMode" class="dropdown-link">
+                <span class="dark-mode-text">Dark mode</span>
+                <span class="theme-switch">
+                  <span class="sun-icon" aria-hidden="true">☀</span>
+                  <span class="moon-icon" aria-hidden="true">🌙</span>
+                </span>
+              </a>
               
               <a href="#" id="userDropdownLogout" class="dropdown-link" style="display: none;">Logout</a>
             </div>
@@ -249,6 +256,11 @@
             </button>
             
           </div>
+        </div>
+
+        <div class="featured-section">
+          <h3 class="section-title">Featured Eco Products</h3>
+          <div id="homeProducts" class="results-grid" aria-label="Featured products"></div>
         </div>
       </section>
       
@@ -416,8 +428,9 @@
               <button id="logoutBtnProfile" class="btn btn-primary" type="button">Logout</button>
             </div>
           </div>
-        </div>
-      </section>
+           </div>
+         </div>
+       </section>
 
       <section id="admin" class="page" aria-hidden="true">
         <div class="settings-section admin-section">

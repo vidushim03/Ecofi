@@ -114,11 +114,85 @@ async function backfillPriceHistory() {
       console.log(`[Backfill] Seeded price history for ${result.modifiedCount} products.`);
     }
   } catch (err) {
-    console.error("[Backfill] Failed to seed price history:", err.message);
+       console.error("[Backfill] Failed to seed price history:", err.message);
+    }
   }
-}
 
-async function connectToMongo(retries = 5) {
+  async function backfillSource() {
+    try {
+      const missing = await Product.find({
+        $or: [{ source: { $exists: false } }, { source: "" }],
+      }).select("_id productUrl").lean();
+      let count = 0, skipped = 0;
+      for (const doc of missing) {
+        const inferred = inferSourceFromUrl(doc.productUrl);
+        if (!inferred) { skipped++; continue; }
+        try {
+          const r = await Product.updateOne(
+            { _id: doc._id },
+            { $set: { source: inferred } }
+          );
+          if (r.modifiedCount > 0) count++;
+        } catch (err) {
+          skipped++;
+        }
+      }
+      console.log(`[Backfill] Inferred source for ${count} products (${skipped} skipped).`);
+    } catch (err) {
+      console.error("[Backfill] Failed to infer source:", err.message);
+    }
+  }
+
+  function extractProductIdFromUrl(source, productUrl) {
+    try {
+      if (!productUrl) return null;
+      if (source === "amazon-in" || source === "amazon-com") {
+        const m = /\/(?:dp|gp\/product)\/([A-Z0-9]{10})/.exec(productUrl);
+        return m ? m[1] : null;
+      }
+      if (source === "flipkart") {
+        const u = new URL(productUrl);
+        const seg = u.pathname.split("/").filter(Boolean);
+        const idx = seg.indexOf("p");
+        if (idx >= 0 && seg[idx + 1]) {
+          const m = /^([A-Za-z0-9_-]+)$/.exec(seg[idx + 1]);
+          if (m) return m[1];
+        }
+        return seg[0] || null;
+      }
+      if (source === "myntra") {
+        const m = /\/([A-Za-z0-9_-]+)\.html$/.exec(productUrl);
+        return m ? m[1] : null;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  async function backfillProductId() {
+    try {
+      const missing = await Product.find({
+        $or: [{ productId: { $exists: false } }, { productId: "" }],
+      }).select("_id source productUrl").lean();
+      let count = 0;
+      for (const doc of missing) {
+        const pid = extractProductIdFromUrl(doc.source, doc.productUrl);
+        if (pid) {
+          const r = await Product.updateOne(
+            { _id: doc._id },
+            { $set: { productId: pid } }
+          );
+          if (r.modifiedCount > 0) count++;
+        }
+      }
+      console.log(`[Backfill] Extracted productId for ${count} products.`);
+    } catch (err) {
+      console.error("[Backfill] Failed to extract productId:", err.message);
+    }
+  }
+
+  async function connectToMongo(retries = 5) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       await mongoose.connect(process.env.MONGO_URI, {
@@ -129,6 +203,8 @@ async function connectToMongo(retries = 5) {
       });
       console.log("✅ MongoDB connected");
       backfillPriceHistory();
+      backfillSource();
+      backfillProductId();
       return;
     } catch (err) {
       console.error(
@@ -622,33 +698,47 @@ async function getEmbedding(text) {
 // =================================================================
 // ADMIN HELPER FUNCTION
 // =================================================================
-function getScraperConfig(source, productId) {
+function inferSourceFromUrl(productUrl) {
+  try {
+    const u = new URL(productUrl);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host === "amazon.in" || host.endsWith(".amazon.in")) return "amazon-in";
+    if (host === "amazon.com" || host === "amazon.co.uk" || host === "amazon.de" || host.endsWith(".amazon.com")) return "amazon-com";
+    if (host.includes("flipkart.com")) return "flipkart";
+    if (host.includes("myntra.com")) return "myntra";
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function getScraperConfig(source, productId, productUrl) {
   let zenRowsEndpoint;
-  let productUrl;
+  let chosenUrl = productUrl;
 
   switch (source) {
     case "amazon-in":
       zenRowsEndpoint =
         "https://ecommerce.api.zenrows.com/v1/targets/amazon/products/";
-      productUrl = `https://www.amazon.in/dp/${productId}`;
+      if (!chosenUrl) chosenUrl = `https://www.amazon.in/dp/${productId}`;
       break;
     case "amazon-com":
       zenRowsEndpoint =
         "https://ecommerce.api.zenrows.com/v1/targets/amazon/products/";
-      productUrl = `https://www.amazon.com/dp/${productId}`;
+      if (!chosenUrl) chosenUrl = `https://www.amazon.com/dp/${productId}`;
       break;
     case "flipkart":
       zenRowsEndpoint = "https://api.zenrows.com/v1/";
-      productUrl = `https://www.flipkart.com/${productId}`;
+      if (!chosenUrl) chosenUrl = `https://www.flipkart.com/${productId}`;
       break;
     case "myntra":
       zenRowsEndpoint = "https://api.zenrows.com/v1/";
-      productUrl = `https://www.myntra.com/${productId}`;
+      if (!chosenUrl) chosenUrl = `https://www.myntra.com/${productId}`;
       break;
     default:
       throw new Error(`Invalid source: ${source}.`);
   }
-  return { zenRowsEndpoint, productUrl };
+  return { zenRowsEndpoint, productUrl: chosenUrl };
 }
 
 function buildZenRowsParams(source, productUrl, apikey) {
@@ -685,8 +775,19 @@ function cleanScrapedPrice(price) {
   return parseFloat(String(price).replace(/[^0-9.]/g, ""));
 }
 
-async function fetchScrapedProduct(source, productId) {
-  const { zenRowsEndpoint, productUrl } = getScraperConfig(source, productId);
+async function fetchScrapedProduct(source, productId, productUrl) {
+  let resolvedSource = source;
+  if (
+    !resolvedSource ||
+    !["amazon-in", "amazon-com", "flipkart", "myntra"].includes(resolvedSource)
+  ) {
+    resolvedSource = inferSourceFromUrl(productUrl) || resolvedSource;
+  }
+  const { zenRowsEndpoint, productUrl: chosenUrl } = getScraperConfig(
+    resolvedSource,
+    productId,
+    productUrl
+  );
 
   let params;
   if (source === "amazon-in" || source === "amazon-com") {
@@ -1252,13 +1353,14 @@ app.get("/api/products/:id/price", priceRefreshLimiter, async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    const fresh = await fetchScrapedProduct(product.source, product.productId);
+    const fresh = await fetchScrapedProduct(product.source, product.productId, product.productUrl);
+
+    const oldPrice = product.price;
 
     if (!product.priceHistory || product.priceHistory.length === 0) {
-      product.priceHistory = [{ price: product.price, date: new Date() }];
-    }
-    if (fresh.price !== product.price) {
-      product.priceHistory.push({ price: product.price, date: new Date() });
+      product.priceHistory = [{ price: oldPrice, date: new Date() }];
+    } else {
+      product.priceHistory.push({ price: oldPrice, date: new Date() });
       if (product.priceHistory.length > 30) {
         product.priceHistory = product.priceHistory.slice(-30);
       }
@@ -1269,10 +1371,10 @@ app.get("/api/products/:id/price", priceRefreshLimiter, async (req, res) => {
     if (fresh.imageUrl) product.imageUrl = fresh.imageUrl;
     if (fresh.description) product.description = fresh.description;
     product.lastPriceUpdated = new Date();
-    await product.save();
+    await product.save({ validateBeforeSave: false });
 
     console.log(
-      `[PriceRefresh] ${product.productId} -> ₹${fresh.price} (was ₹${product.price})`
+      `[PriceRefresh] ${product.productId || product._id} -> ₹${fresh.price} (was ₹${oldPrice})`
     );
     res.json({
       product: {
