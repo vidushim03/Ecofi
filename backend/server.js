@@ -17,6 +17,14 @@ const cookieParser = require("cookie-parser");
 
 dotenv.config();
 
+const _envJwt = process.env.JWT_SECRET;
+const JWT_SECRET = _envJwt && _envJwt.trim() ? _envJwt : "ecofi-dev-secret-change-me";
+const _envAdmin = process.env.ADMIN_SECRET_KEY;
+const ADMIN_SECRET_KEY = _envAdmin && _envAdmin.trim() ? _envAdmin : "ecofi-admin-change-me";
+if (!process.env.MONGO_URI) {
+  console.warn("⚠️  MONGO_URI is not set — the server cannot start without a MongoDB connection string.");
+}
+
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGIN || "*")
   .split(",")
@@ -236,7 +244,7 @@ const protect = async (req, res, next) => {
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET);
 
       req.user = await User.findById(decoded.id).select("-password");
 
@@ -290,7 +298,7 @@ app.post("/api/signup", async (req, res) => {
     const user = await User.create({ name, email, password: hashed });
     const token = jwt.sign(
       { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
+      JWT_SECRET,
       {
         expiresIn: "7d",
       }
@@ -320,7 +328,7 @@ app.post("/api/login", async (req, res) => {
     }
     const token = jwt.sign(
       { id: user._id, email: user.email },
-      process.env.JWT_SECRET,
+      JWT_SECRET,
       {
         expiresIn: "7d",
       }
@@ -904,7 +912,7 @@ app.post("/api/admin/addproduct", async (req, res) => {
       adminKey,
     } = req.body;
 
-    if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+    if (adminKey !== ADMIN_SECRET_KEY) {
       return res
         .status(401)
         .json({ message: "Unauthorized: Invalid Admin Key" });
@@ -1003,7 +1011,7 @@ app.post("/api/admin/add-bulk", async (req, res) => {
   try {
     const { products, adminKey } = req.body;
 
-    if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+    if (adminKey !== ADMIN_SECRET_KEY) {
       return res
         .status(401)
         .json({ message: "Unauthorized: Invalid Admin Key" });
@@ -1184,7 +1192,7 @@ app.post("/api/admin/add-bulk", async (req, res) => {
 app.post("/api/admin/remove-products", async (req, res) => {
   try {
     const { filters, adminKey } = req.body;
-    if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+    if (adminKey !== ADMIN_SECRET_KEY) {
       return res
         .status(401)
         .json({ message: "Unauthorized: Invalid Admin Key" });
