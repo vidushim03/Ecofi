@@ -15,6 +15,8 @@ It combines a responsive frontend, secure user authentication, wishlist manageme
 - Admin ingestion endpoints for adding/removing products from multiple marketplaces
 - Live price-refresh on every product plus a price-history chart (sparkline) in the detail modal
 - Product detail modal with eco-score badge, eco reasons, and a one-click "Buy on \<store\>" link
+- Advanced product filters (price range, eco-grade, store, subcategory) with eco-score sorting
+- Eco-score breakdown in the detail modal (overall 0-100 score plus contributing factors)
 - Responsive UI with mobile-friendly navigation, account settings sidebar, and a dark-mode toggle
 - Security hardening: Helmet CSP, rate limiting, httpOnly JWT cookie auth, secret-file protection, and gzip
 
@@ -132,6 +134,18 @@ Set these secrets in Render:
 - Configure API base URL using `localStorage` or a custom bootstrap script
 - `vercel.json` and `netlify.toml` are included for zero-config static deployment
 
+### Local development with Docker
+
+```bash
+# Full stack (uses MongoDB Atlas via backend/.env)
+docker compose up --build
+
+# Or with a local MongoDB instead of Atlas
+docker compose --profile local-db up --build
+```
+
+The backend `Dockerfile` runs `npm install` and `node server.js` on port 4000.
+
 ## Testing
 
 Run smoke tests:
@@ -141,11 +155,21 @@ cd backend
 npm run test:smoke
 ```
 
+Run end-to-end browser tests (spins up an in-memory MongoDB with seeded sample products):
+
+```bash
+cd backend
+npm install
+npx playwright install chromium
+npm run test:e2e
+```
+
 What the tests currently cover:
 - portable asset paths
 - API URL indirection
 - presence of core backend routes
 - presence of search/admin UI wiring
+- E2E: featured products render, advanced filters narrow results, eco-score breakdown renders in the modal, price-range filter works
 
 ## Future Improvements
 
