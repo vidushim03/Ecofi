@@ -221,7 +221,6 @@ async function backfillPriceHistory() {
       }
     }
   }
-}
 
 connectToMongo();
 
