@@ -200,29 +200,25 @@ async function backfillPriceHistory() {
     }
   }
 
-  async function connectToMongo(retries = 5) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 30000,
-        connectTimeoutMS: 30000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-      });
-      console.log("✅ MongoDB connected");
-      backfillPriceHistory();
-      backfillSource();
-      backfillProductId();
-      return;
-    } catch (err) {
-      console.error(
-        `❌ MongoDB connection attempt ${attempt}/${retries} failed: ${err.message}`
-      );
-      if (attempt === retries) {
-        console.error("❌ Could not connect to MongoDB. Exiting.");
-        process.exit(1);
+  async function connectToMongo() {
+    while (true) {
+      try {
+        await mongoose.connect(process.env.MONGO_URI, {
+          serverSelectionTimeoutMS: 30000,
+          connectTimeoutMS: 30000,
+          socketTimeoutMS: 45000,
+          maxPoolSize: 10,
+        });
+        console.log("✅ MongoDB connected");
+        backfillPriceHistory();
+        backfillSource();
+        backfillProductId();
+        return;
+      } catch (err) {
+        console.error(`❌ MongoDB connection failed: ${err.message}`);
+        console.error("⏳ Retrying in 10s (service stays up; will connect once the database is reachable)...");
+        await new Promise((resolve) => setTimeout(resolve, 10000));
       }
-      await new Promise((resolve) => setTimeout(resolve, 10000));
     }
   }
 }
