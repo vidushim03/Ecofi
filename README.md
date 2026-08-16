@@ -13,7 +13,10 @@ It combines a responsive frontend, secure user authentication, wishlist manageme
 - Paginated search UI with recent searches, popular search chips, loading states, and relevance badges
 - Admin tools UI for single product ingestion, bulk import, and controlled deletion flows
 - Admin ingestion endpoints for adding/removing products from multiple marketplaces
-- Responsive UI with mobile-friendly navigation and account settings sidebar
+- Live price-refresh on every product plus a price-history chart (sparkline) in the detail modal
+- Product detail modal with eco-score badge, eco reasons, and a one-click "Buy on \<store\>" link
+- Responsive UI with mobile-friendly navigation, account settings sidebar, and a dark-mode toggle
+- Security hardening: Helmet CSP, rate limiting, httpOnly JWT cookie auth, secret-file protection, and gzip
 
 ## Tech Stack
 
@@ -147,6 +150,5 @@ What the tests currently cover:
 ## Future Improvements
 
 - Add role-based admin authentication middleware
-- Add pagination and caching for product listing
-- Add CI pipeline for automated linting/testing
-- Add end-to-end browser tests for auth and wishlist flows
+- Add end-to-end browser tests (Playwright) for auth + wishlist + modal flows
+- Add a featured-products section on the home page (in progress)
