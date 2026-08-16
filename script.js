@@ -56,21 +56,27 @@ async function refreshProductPrice(productId, button) {
       throw new Error(data.message || "Failed to refresh price");
     }
     const p = data.product;
-    const card = button.closest(".product-card");
+    const fmtPrice = `₹${Number(p.price).toFixed(2)}`;
+    const fmtUpdated = `Updated ${formatTimeAgo(p.lastPriceUpdated)}`;
+
+    // Update the grid card (works whether the refresh was triggered from the
+    // card itself or from inside the detail modal, where the button is not a
+    // descendant of the card).
+    const card = document.querySelector(`.product-card[data-product-id="${CSS.escape(productId)}"]`);
     if (card) {
       const priceEl = card.querySelector(".price-value");
       const updatedEl = card.querySelector(".price-updated");
-      if (priceEl) priceEl.textContent = `₹${Number(p.price).toFixed(2)}`;
-      if (updatedEl)
-        updatedEl.textContent = `Updated ${formatTimeAgo(p.lastPriceUpdated)}`;
+      if (priceEl) priceEl.textContent = fmtPrice;
+      if (updatedEl) updatedEl.textContent = fmtUpdated;
     }
-    const modal = button.closest(".product-modal");
-    if (modal) {
+
+    // Update the detail modal if it is open for this product.
+    const modal = document.getElementById("productModal");
+    if (modal && !modal.hidden && modal.querySelector(`.product-detail[data-product-id="${CSS.escape(productId)}"], .product-detail`)) {
       const valueEl = modal.querySelector(".product-detail-price-value");
       const updatedEl = modal.querySelector(".price-updated");
-      if (valueEl) valueEl.textContent = `₹${Number(p.price).toFixed(2)}`;
-      if (updatedEl)
-        updatedEl.textContent = `Updated ${formatTimeAgo(p.lastPriceUpdated)}`;
+      if (valueEl) valueEl.textContent = fmtPrice;
+      if (updatedEl) updatedEl.textContent = fmtUpdated;
       const historyEl = modal.querySelector(".product-detail-history");
       if (historyEl && Array.isArray(p.priceHistory) && p.priceHistory.length >= 2) {
         historyEl.innerHTML = `<h3>Price History</h3>${renderSparkline(p.priceHistory)}`;
@@ -169,7 +175,7 @@ function renderProductDetail(product) {
       : [];
 
   content.innerHTML = `
-    <div class="product-detail">
+    <div class="product-detail" data-product-id="${escapeHtml(product._id)}">
       <div class="product-detail-main">
         <div class="product-detail-image">
           <img src="${escapeHtml(product.imageUrl || "images/logo-main.png")}" alt="${escapeHtml(product.title)}">
