@@ -482,6 +482,178 @@ body.dark .theme-switch .moon-icon { opacity: 1; color: #90cdf4; }
   border-color: var(--primary);
 }
 
+/* ---------- Advanced filters sidebar ---------- */
+.search-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--spacing-xl);
+  align-items: start;
+}
+
+.filters-sidebar {
+  background-color: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: var(--spacing-lg);
+  position: sticky;
+  top: 84px;
+}
+
+.filters-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+.filters-sidebar-head h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.filter-group {
+  margin-bottom: var(--spacing-lg);
+}
+.filter-group:last-child {
+  margin-bottom: 0;
+}
+.filter-label {
+  display: block;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+.price-inputs {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+.price-inputs input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+.price-dash {
+  color: var(--text-secondary);
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+.checkbox-list label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+.filter-loading {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+#subCategoryFilter {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  padding: 0;
+}
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Eco score breakdown ---------- */
+.eco-breakdown-overall {
+  margin-bottom: var(--spacing-md);
+}
+.eco-score-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-sm);
+}
+.eco-score-num {
+  font-weight: 700;
+  font-size: var(--font-size-md);
+}
+.eco-score-bar {
+  height: 10px;
+  border-radius: 6px;
+  background-color: var(--border);
+  overflow: hidden;
+}
+.eco-score-fill {
+  height: 100%;
+  border-radius: 6px;
+  background-color: var(--primary);
+  transition: width var(--transition-base);
+}
+.eco-score-fill.eco-ap { background-color: #1b8a3a; }
+.eco-score-fill.eco-a { background-color: #43a047; }
+.eco-score-fill.eco-b { background-color: #f0a020; }
+.eco-score-fill.eco-c { background-color: #d9534f; }
+
+.eco-dims {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+}
+.eco-dim {
+  background-color: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+.eco-dim-head {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-xs);
+}
+.eco-dim-icon {
+  margin-right: var(--spacing-xs);
+}
+.eco-dim-items {
+  margin: 0;
+  padding-left: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.eco-breakdown-note {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+.eco-all-reasons {
+  margin-top: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+.eco-all-reasons summary {
+  cursor: pointer;
+  color: var(--primary);
+}
+
+
 .results-per-page {
   display: inline-flex;
   align-items: center;
@@ -1129,6 +1301,12 @@ body.dark .theme-switch .moon-icon { opacity: 1; color: #90cdf4; }
 @media (max-width: 1024px) {
   .top-nav {
     display: none;
+  }
+  .search-layout {
+    grid-template-columns: 1fr;
+  }
+  .filters-sidebar {
+    position: static;
   }
 }
 

@@ -284,13 +284,58 @@
               <option value="relevance">Sort: Relevance</option>
               <option value="price-asc">Price: Low to High</option>
               <option value="price-desc">Price: High to Low</option>
+              <option value="eco">Eco score: Best first</option>
               <option value="title-asc">Title: A to Z</option>
             </select>
           </div>
 
-          <div id="resultsState" class="results-state" aria-live="polite"></div>
-          <div id="results" class="results-grid" aria-label="Search results"></div>
-          <div id="paginationControls" class="pagination-controls" aria-label="Pagination"></div>
+          <div class="search-layout">
+            <aside class="filters-sidebar" aria-label="Product filters">
+              <div class="filters-sidebar-head">
+                <h3>Filters</h3>
+                <button type="button" id="clearFiltersBtn" class="btn-link">Clear all</button>
+              </div>
+
+              <div class="filter-group">
+                <label class="filter-label">Price range (₹)</label>
+                <div class="price-inputs">
+                  <input type="number" id="minPrice" min="0" inputmode="numeric" placeholder="Min" aria-label="Minimum price" />
+                  <span class="price-dash">–</span>
+                  <input type="number" id="maxPrice" min="0" inputmode="numeric" placeholder="Max" aria-label="Maximum price" />
+                </div>
+              </div>
+
+              <div class="filter-group">
+                <span class="filter-label">Eco grade</span>
+                <div id="ecoGradeFilters" class="checkbox-list">
+                  <label><input type="checkbox" class="eco-grade-cb" value="A+" /> <span class="eco-badge eco-ap">A+</span></label>
+                  <label><input type="checkbox" class="eco-grade-cb" value="A" /> <span class="eco-badge eco-a">A</span></label>
+                  <label><input type="checkbox" class="eco-grade-cb" value="B" /> <span class="eco-badge eco-b">B</span></label>
+                  <label><input type="checkbox" class="eco-grade-cb" value="C" /> <span class="eco-badge eco-c">C</span></label>
+                </div>
+              </div>
+
+              <div class="filter-group">
+                <span class="filter-label">Store</span>
+                <div id="storeFilters" class="checkbox-list">
+                  <p class="filter-loading">Loading stores…</p>
+                </div>
+              </div>
+
+              <div class="filter-group">
+                <label class="filter-label" for="subCategoryFilter">Subcategory</label>
+                <select id="subCategoryFilter" aria-label="Subcategory">
+                  <option value="">All subcategories</option>
+                </select>
+              </div>
+            </aside>
+
+            <div class="search-results-col">
+              <div id="resultsState" class="results-state" aria-live="polite"></div>
+              <div id="results" class="results-grid" aria-label="Search results"></div>
+              <div id="paginationControls" class="pagination-controls" aria-label="Pagination"></div>
+            </div>
+          </div>
         </div>
       </section>
       

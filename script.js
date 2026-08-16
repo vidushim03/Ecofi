@@ -193,7 +193,7 @@ function renderProductDetail(product) {
       ${history.length ? `<div class="product-detail-history"><h3>Price History</h3>${renderSparkline(history)}</div>` : ""}
       <div class="product-detail-section">
         <h3>Why it's eco-friendly</h3>
-        <ul class="eco-reasons">${reasons}</ul>
+        ${renderEcoBreakdown(product)}
       </div>
       <div class="product-detail-section">
         <h3>About this product</h3>
@@ -232,6 +232,62 @@ function renderSparkline(history) {
       <text x="${w - 46}" y="${h - 2}" class="sparkline-label">₹${max}</text>
     </svg>
   `;
+}
+
+const ECO_DIMENSIONS = [
+  { key: "Materials", icon: "♻️", words: ["eco-friendly", "eco friendly", "sustainable", "recycled", "organic", "natural", "bamboo", "cotton", "wood", "jute", "hemp", "biodegradable", "compostable", "plant-based", "reusable", "soy", "wax", "glass", "stainless", "ceramic", "stoneware", "material"] },
+  { key: "Packaging", icon: "📦", words: ["packaging", "plastic-free", "plastic free", "recyclable", "minimal waste", "zero waste", "wrap"] },
+  { key: "Certifications", icon: "🏅", words: ["certified", "fsc", "gots", "iso", "eco-label", "green seal", "certification", "b corp", "fair trade", "fairtrade", "lab tested", "tested"] },
+  { key: "Energy & Durability", icon: "🛡️", words: ["solar", "led", "energy", "rechargeable", "efficient", "durable", "long-lasting", "long lasting", "refillable", "refill", "warranty", "low power", "aromatherapy"] },
+];
+
+function ecoGradeToScore(grade) {
+  return { "A+": 95, A: 85, B: 70, C: 55 }[grade] || 60;
+}
+
+function renderEcoBreakdown(product) {
+  const grade = product.ecoScore || "B";
+  const score = ecoGradeToScore(grade);
+  const gradeClass = `eco-${String(grade).toLowerCase().replace("+", "p")}`;
+  const reasons = Array.isArray(product.ecoReasons) ? product.ecoReasons : [];
+
+  const dims = ECO_DIMENSIONS.map((d) => ({
+    ...d,
+    items: reasons.filter((r) => d.words.some((w) => String(r).toLowerCase().includes(w))),
+  })).filter((d) => d.items.length);
+
+  const overall = `
+    <div class="eco-breakdown-overall">
+      <div class="eco-score-head">
+        <span class="eco-badge ${gradeClass}">Eco ${escapeHtml(grade)}</span>
+        <span class="eco-score-num">${score}/100</span>
+      </div>
+      <div class="eco-score-bar" role="img" aria-label="Eco score ${score} out of 100">
+        <div class="eco-score-fill ${gradeClass}" style="width:${score}%"></div>
+      </div>
+    </div>`;
+
+  const dimBlocks = dims.length
+    ? `<div class="eco-dims">${dims
+        .map(
+          (d) => `
+        <div class="eco-dim">
+          <div class="eco-dim-head"><span class="eco-dim-icon">${d.icon}</span>${escapeHtml(d.key)}</div>
+          <ul class="eco-dim-items">${d.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+        </div>`
+        )
+        .join("")}</div>`
+    : (reasons.length
+        ? ""
+        : `<p class="eco-breakdown-note">We're still calculating the detailed breakdown for this product.</p>`);
+
+  const allReasons = reasons.length
+    ? `<details class="eco-all-reasons"><summary>All eco notes (${reasons.length})</summary><ul>${reasons
+        .map((r) => `<li>${escapeHtml(r)}</li>`)
+        .join("")}</ul></details>`
+    : "";
+
+  return `<div class="eco-breakdown">${overall}${dimBlocks}${allReasons}</div>`;
 }
 
 function clearSearchFilters() {
@@ -663,6 +719,9 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
     effectiveSubCategory = currentSearchFilters.subCategory;
     effectiveL3Category = currentSearchFilters.l3Category;
   }
+
+  const subSelect = document.getElementById("subCategoryFilter");
+  if (subSelect) subSelect.value = effectiveSubCategory || "";
   
   const searchTerm = document.getElementById('headerSearch').value.trim();
   const hasSearchTerm = searchTerm.length > 0;
@@ -676,8 +735,22 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
     if (includeQuery && searchTerm) url.searchParams.append("q", searchTerm);
     // Global text search should not be restricted by current category filters.
     if (!hasSearchTerm && effectiveCategory) url.searchParams.append("category", effectiveCategory);
-    if (!hasSearchTerm && effectiveSubCategory) url.searchParams.append("subCategory", effectiveSubCategory);
+    const subSelect = document.getElementById("subCategoryFilter");
+    const activeSub = (subSelect && subSelect.value) || effectiveSubCategory;
+    if (!hasSearchTerm && activeSub) url.searchParams.append("subCategory", activeSub);
     if (!hasSearchTerm && effectiveL3Category) url.searchParams.append("l3Category", effectiveL3Category);
+
+    const minPrice = document.getElementById("minPrice")?.value.trim();
+    const maxPrice = document.getElementById("maxPrice")?.value.trim();
+    if (minPrice) url.searchParams.append("minPrice", minPrice);
+    if (maxPrice) url.searchParams.append("maxPrice", maxPrice);
+
+    const grades = Array.from(document.querySelectorAll(".eco-grade-cb:checked")).map((cb) => cb.value);
+    if (grades.length) url.searchParams.append("ecoScore", grades.join(","));
+
+    const stores = Array.from(document.querySelectorAll("#storeFilters input[type=checkbox]:checked")).map((cb) => cb.value);
+    if (stores.length) url.searchParams.append("source", stores.join(","));
+
     if (sort) url.searchParams.append("sort", sort);
     url.searchParams.append("page", String(searchState.page));
     url.searchParams.append("pageSize", String(searchState.pageSize));
@@ -806,6 +879,34 @@ async function loadFeaturedProducts() {
   } catch (err) {
     console.error("[Home] Could not load featured products:", err);
     grid.innerHTML = '<p class="search-summary">Could not load featured products right now.</p>';
+  }
+}
+
+async function loadFilterOptions() {
+  try {
+    const res = await fetch(apiUrl("/api/filters"));
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const storeWrap = document.getElementById("storeFilters");
+    if (storeWrap && Array.isArray(data.sources)) {
+      storeWrap.innerHTML = data.sources.length
+        ? data.sources
+            .map((s) => `<label><input type="checkbox" value="${escapeHtml(s)}" /> ${escapeHtml(inferSourceLabel(null, s))}</label>`)
+            .join("")
+        : '<p class="filter-loading">No stores yet.</p>';
+    }
+
+    const subSel = document.getElementById("subCategoryFilter");
+    if (subSel && Array.isArray(data.subCategories)) {
+      const current = subSel.value;
+      subSel.innerHTML =
+        '<option value="">All subcategories</option>' +
+        data.subCategories.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+      subSel.value = current;
+    }
+  } catch (err) {
+    console.error("[Filters] Could not load filter options:", err);
   }
 }
 
@@ -1086,6 +1187,55 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchState.page = 1;
     fetchAndRenderProducts();
   });
+
+  // --- Advanced filters ---
+  const subCategoryFilter = document.getElementById("subCategoryFilter");
+  if (subCategoryFilter) {
+    subCategoryFilter.addEventListener("change", (e) => {
+      currentSearchFilters.subCategory = e.target.value || null;
+      sessionStorage.setItem(FILTERS_KEY, JSON.stringify(currentSearchFilters));
+      searchState.page = 1;
+      fetchAndRenderProducts();
+    });
+  }
+  document.querySelectorAll(".eco-grade-cb").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      searchState.page = 1;
+      fetchAndRenderProducts();
+    });
+  });
+  const storeFiltersEl = document.getElementById("storeFilters");
+  if (storeFiltersEl) {
+    storeFiltersEl.addEventListener("change", (e) => {
+      if (e.target.matches('input[type="checkbox"]')) {
+        searchState.page = 1;
+        fetchAndRenderProducts();
+      }
+    });
+  }
+  let priceDebounce;
+  const onPriceInput = () => {
+    clearTimeout(priceDebounce);
+    priceDebounce = setTimeout(() => {
+      searchState.page = 1;
+      fetchAndRenderProducts();
+    }, 400);
+  };
+  document.getElementById("minPrice")?.addEventListener("input", onPriceInput);
+  document.getElementById("maxPrice")?.addEventListener("input", onPriceInput);
+  document.getElementById("clearFiltersBtn")?.addEventListener("click", () => {
+    const minP = document.getElementById("minPrice");
+    const maxP = document.getElementById("maxPrice");
+    if (minP) minP.value = "";
+    if (maxP) maxP.value = "";
+    document.querySelectorAll(".eco-grade-cb").forEach((cb) => (cb.checked = false));
+    document.querySelectorAll("#storeFilters input[type=checkbox]").forEach((cb) => (cb.checked = false));
+    if (subCategoryFilter) subCategoryFilter.value = "";
+    currentSearchFilters.subCategory = null;
+    searchState.page = 1;
+    fetchAndRenderProducts();
+  });
+  loadFilterOptions();
   
   document.getElementById("quickSearchBtn")?.addEventListener("click", () => {
     clearSearchFilters(); 

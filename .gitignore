@@ -11,3 +11,9 @@ backend/.env
 # OS/editor
 .DS_Store
 Thumbs.db
+
+# Playwright / E2E
+backend/test-results/
+backend/playwright-report/
+backend/.cache/
+.playwright/

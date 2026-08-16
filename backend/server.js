@@ -519,18 +519,68 @@ function buildPaginationMeta(page, pageSize, total, searchSource) {
   };
 }
 
-async function atlasTextSearch({ q, category, subCategory, l3Category, sortOption }) {
+// Translate request query params into a MongoDB filter for products.
+function parseCsv(value) {
+  return value ? String(value).split(",").map((s) => s.trim()).filter(Boolean) : [];
+}
+
+function buildProductFilter(query) {
+  const filter = {};
+  if (query.category) filter.category = query.category;
+  if (query.subCategory) filter.subCategory = query.subCategory;
+  if (query.l3Category) filter.l3Category = query.l3Category;
+
+  const sources = parseCsv(query.source);
+  if (sources.length) filter.source = { $in: sources };
+
+  const grades = parseCsv(query.ecoScore);
+  if (grades.length) filter.ecoScore = { $in: grades };
+
+  const minPrice = Number(query.minPrice);
+  const maxPrice = Number(query.maxPrice);
+  if (Number.isFinite(minPrice) && minPrice > 0) {
+    filter.price = { ...(filter.price || {}), $gte: minPrice };
+  }
+  if (Number.isFinite(maxPrice) && maxPrice > 0) {
+    filter.price = { ...(filter.price || {}), $lte: maxPrice };
+  }
+  return filter;
+}
+
+const ECO_GRADE_RANK = { "A+": 4, A: 3, B: 2, C: 1 };
+function ecoGradeRank(grade) {
+  return ECO_GRADE_RANK[grade] || 0;
+}
+
+function ecoGradeCompare(a, b) {
+  return ecoGradeRank(b.ecoScore) - ecoGradeRank(a.ecoScore);
+}
+
+async function atlasTextSearch({ q, filter: filterObj = {}, sortOption }) {
   const rawQuery = String(q || "").trim();
   if (!rawQuery) return [];
 
   const atlasIndexName = process.env.ATLAS_SEARCH_INDEX || "default";
   const atlasSynonymsName = process.env.ATLAS_SEARCH_SYNONYMS;
   const filter = [];
-  if (category) filter.push({ equals: { path: "category", value: category } });
-  if (subCategory) {
-    filter.push({ equals: { path: "subCategory", value: subCategory } });
+  for (const [key, value] of Object.entries(filterObj)) {
+    if (key === "source" && value.$in) {
+      filter.push({ in: { path: "source", value: value.$in } });
+    } else if (key === "ecoScore" && value.$in) {
+      filter.push({ in: { path: "ecoScore", value: value.$in } });
+    } else if (key === "category") {
+      filter.push({ equals: { path: "category", value } });
+    } else if (key === "subCategory") {
+      filter.push({ equals: { path: "subCategory", value } });
+    } else if (key === "l3Category") {
+      filter.push({ equals: { path: "l3Category", value } });
+    } else if (key === "price") {
+      const range = {};
+      if (value.$gte != null) range.gte = value.$gte;
+      if (value.$lte != null) range.lte = value.$lte;
+      if (Object.keys(range).length) filter.push({ range: { path: "price", ...range } });
+    }
   }
-  if (l3Category) filter.push({ equals: { path: "l3Category", value: l3Category } });
 
   const expandedQueries = getExpandedQueries(rawQuery);
   const textQuery = expandedQueries.length > 0 ? expandedQueries : [rawQuery];
@@ -608,9 +658,7 @@ async function atlasTextSearch({ q, category, subCategory, l3Category, sortOptio
 
 async function fallbackTextSearch({
   q,
-  category,
-  subCategory,
-  l3Category,
+  filter: filterObj = {},
   sortOption,
 }) {
   const rawQuery = String(q || "").trim();
@@ -645,10 +693,8 @@ async function fallbackTextSearch({
 
   const fallbackFilter = {
     $or: textOrFilters,
+    ...filterObj,
   };
-  if (category) fallbackFilter.category = category;
-  if (subCategory) fallbackFilter.subCategory = subCategory;
-  if (l3Category) fallbackFilter.l3Category = l3Category;
 
   return Product.find(fallbackFilter)
     .sort(sortOption)
@@ -1176,6 +1222,7 @@ app.get("/api/products", async (req, res) => {
     const { category, subCategory, l3Category, sort, q } = req.query;
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const pageSize = Math.min(24, Math.max(4, Number.parseInt(req.query.pageSize, 10) || 12));
+    const filter = buildProductFilter(req.query);
     const sortOption = {};
     switch (sort) {
       case "price-asc":
@@ -1202,21 +1249,9 @@ app.get("/api/products", async (req, res) => {
         console.error(
           "[Search] Failed to generate query vector. Trying Atlas Search fallback."
         );
-        products = await atlasTextSearch({
-          q,
-          category,
-          subCategory,
-          l3Category,
-          sortOption,
-        });
+        products = await atlasTextSearch({ q, filter, sortOption });
         if (!products || products.length === 0) {
-          products = await fallbackTextSearch({
-            q,
-            category,
-            subCategory,
-            l3Category,
-            sortOption,
-          });
+          products = await fallbackTextSearch({ q, filter, sortOption });
           searchSource = "keyword";
         } else {
           searchSource = "fuzzy";
@@ -1234,7 +1269,7 @@ app.get("/api/products", async (req, res) => {
             },
           },
           {
-            $match: {},
+            $match: filter,
           },
           {
             $project: {
@@ -1243,10 +1278,6 @@ app.get("/api/products", async (req, res) => {
           },
         ];
 
-        if (category) pipeline[1].$match.category = category;
-        if (subCategory) pipeline[1].$match.subCategory = subCategory;
-        if (l3Category) pipeline[1].$match.l3Category = l3Category;
-
         console.log(`[Search] Executing aggregation pipeline...`);
         products = await Product.aggregate(pipeline);
         console.log(`[Search] Found ${products.length} vector results.`);
@@ -1254,21 +1285,9 @@ app.get("/api/products", async (req, res) => {
           console.log(
             "[Search] Vector search returned 0 results. Trying Atlas Search fallback."
           );
-          products = await atlasTextSearch({
-            q,
-            category,
-            subCategory,
-            l3Category,
-            sortOption,
-          });
+          products = await atlasTextSearch({ q, filter, sortOption });
           if (!products || products.length === 0) {
-            products = await fallbackTextSearch({
-              q,
-              category,
-              subCategory,
-              l3Category,
-              sortOption,
-            });
+            products = await fallbackTextSearch({ q, filter, sortOption });
             searchSource = "keyword";
           } else {
             searchSource = "fuzzy";
@@ -1279,24 +1298,28 @@ app.get("/api/products", async (req, res) => {
         trackFailedSearch(q);
         logTopFailedSearches();
       }
+      if (sort === "eco") products.sort(ecoGradeCompare);
       products = annotateProducts(products, searchSource);
     } else {
       console.log(`[Search] Performing filter search.`);
-      const filter = {};
-      if (category) filter.category = category;
-      if (subCategory) filter.subCategory = subCategory;
-      if (l3Category) filter.l3Category = l3Category;
       const total = await Product.countDocuments(filter);
-      products = await Product.find(filter)
-        .sort(sortOption)
-        .skip((page - 1) * pageSize)
-        .limit(pageSize)
-        .lean()
-        .select("-product_embedding");
-      console.log(`[Search] Found ${products.length} filter results.`);
+      let results;
+      if (sort === "eco") {
+        results = await Product.find(filter).lean().select("-product_embedding");
+        results.sort(ecoGradeCompare);
+        results = results.slice((page - 1) * pageSize, page * pageSize);
+      } else {
+        results = await Product.find(filter)
+          .sort(sortOption)
+          .skip((page - 1) * pageSize)
+          .limit(pageSize)
+          .lean()
+          .select("-product_embedding");
+      }
+      console.log(`[Search] Found ${results.length} filter results.`);
       res.set("Cache-Control", "public, max-age=60");
       return res.json({
-        products: annotateProducts(products, searchSource),
+        products: annotateProducts(results, searchSource),
         meta: buildPaginationMeta(page, pageSize, total, searchSource),
       });
     }
@@ -1320,6 +1343,29 @@ app.get("/api/categories", async (req, res) => {
   } catch (err) {
     console.error("Error in /api/categories:", err.message);
     res.status(500).json({ message: "Server error fetching categories" });
+  }
+});
+
+app.get("/api/filters", async (req, res) => {
+  try {
+    const [sources, ecoScores, subCategories, priceAgg] = await Promise.all([
+      Product.distinct("source"),
+      Product.distinct("ecoScore"),
+      Product.distinct("subCategory"),
+      Product.aggregate([
+        { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } },
+      ]),
+    ]);
+    res.set("Cache-Control", "public, max-age=300");
+    res.json({
+      sources,
+      ecoScores,
+      subCategories: subCategories.filter(Boolean),
+      priceRange: priceAgg[0] || { min: 0, max: 0 },
+    });
+  } catch (err) {
+    console.error("Error in /api/filters:", err.message);
+    res.status(500).json({ message: "Server error fetching filters" });
   }
 });
 

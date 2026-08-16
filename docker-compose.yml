@@ -1,0 +1,26 @@
+services:
+  app:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+    restart: unless-stopped
+    # To use a local MongoDB instead of MongoDB Atlas, run with the
+    # `local-db` profile: `docker compose --profile local-db up` and set
+    # MONGO_URI=mongodb://mongo:27017/ecofi in backend/.env.
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    profiles: ["local-db"]
+
+volumes:
+  mongo-data:
