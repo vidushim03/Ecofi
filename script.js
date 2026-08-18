@@ -15,7 +15,7 @@ const ADMIN_KEY_STORAGE = "ecofi_admin_key";
 const API_BASE_URL = (
   window.ECOFI_API_BASE_URL ||
   localStorage.getItem("ecofi_api_base_url") ||
-  (window.location.hostname === "localhost" ? "http://localhost:4000" : "")
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:" ? "http://localhost:4000" : "")
 ).replace(/\/+$/, "");
 const searchState = {
   page: 1,
@@ -737,7 +737,7 @@ async function fetchAndRenderProducts(category, subCategory, l3Category) {
   searchState.lastQuery = searchTerm;
 
   const buildProductsUrl = (includeQuery = true) => {
-    const url = new URL(apiUrl("/api/products"));
+    const url = new URL(apiUrl("/api/products"), window.location.origin);
     if (includeQuery && searchTerm) url.searchParams.append("q", searchTerm);
     // Global text search should not be restricted by current category filters.
     if (!hasSearchTerm && effectiveCategory) url.searchParams.append("category", effectiveCategory);

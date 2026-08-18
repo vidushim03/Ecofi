@@ -32,7 +32,7 @@ const corsOrigins = (process.env.CORS_ORIGIN || "*")
   .filter(Boolean);
 
 const corsOptions = corsOrigins.includes("*")
-  ? {}
+  ? { origin: true }
   : {
       origin: corsOrigins,
     };
